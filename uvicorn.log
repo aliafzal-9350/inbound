@@ -1,0 +1,63 @@
+INFO:     Started server process [231868]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8005 (Press CTRL+C to quit)
+[Gemini LLM Warning] Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.
+INFO:     2a03:2880:10ff:15:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:1d:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:5:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+[Gemini LLM Warning] Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.
+INFO:     2a03:2880:10ff:5f:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:57:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+[Gemini LLM Warning] Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.
+INFO:     2a03:2880:10ff:1b:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:13:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:22:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+[Gemini LLM Warning] Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.
+INFO:     2a03:2880:10ff:73:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:5d:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:5:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+[Gemini LLM Warning] Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.
+INFO:     2a03:2880:10ff:1b:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:55:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:8:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:52:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:5e:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+[Gemini LLM Warning] Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.
+INFO:     2a03:2880:10ff:5:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:42:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:1:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+[Gemini LLM Warning] Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.
+INFO:     2a03:2880:10ff:13:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:b:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:41:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+[Gemini LLM Warning] Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.
+INFO:     2a03:2880:10ff:54:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:51:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:43:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+[Gemini LLM Warning] Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.
+INFO:     2a03:2880:10ff:4c:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:4c:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:4d:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+[Gemini LLM Warning] Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.
+INFO:     2a03:2880:10ff:c:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+INFO:     2a03:2880:10ff:5d:::0 - "POST /api/webhooks/meta HTTP/1.1" 200 OK
+[Gemini LLM Warning] Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.
+INFO:     2a03:2880:22ff:4:::0 - "POST /webhooks/meta HTTP/1.1" 200 OK
+INFO:     172.70.242.114:0 - "GET /wp-admin/install.php?step=1 HTTP/1.1" 404 Not Found
+INFO:     45.153.102.164:0 - "GET / HTTP/1.1" 200 OK
+INFO:     45.153.102.164:0 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     45.153.102.164:0 - "GET /.env.local HTTP/1.1" 404 Not Found
+INFO:     45.153.102.164:0 - "GET /.git/config HTTP/1.1" 404 Not Found
+INFO:     149.104.78.207:0 - "GET / HTTP/1.1" 200 OK
+INFO:     202.78.167.217:0 - "GET / HTTP/1.1" 200 OK
+INFO:     154.47.30.132:0 - "GET / HTTP/1.1" 200 OK
+INFO:     154.47.30.132:0 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     87.58.197.202:0 - "GET / HTTP/1.1" 200 OK
+INFO:     103.4.250.30:0 - "GET / HTTP/1.1" 200 OK
+INFO:     104.164.126.31:0 - "GET / HTTP/1.1" 200 OK
+INFO:     104.164.126.31:0 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:0 - "HEAD /health HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:0 - "GET /health HTTP/1.1" 200 OK

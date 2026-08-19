@@ -39,10 +39,21 @@ def send_instagram_message(ig_business_account_id: str, access_token: str, recip
         print(f"[MOCK] instagram -> would send to {recipient_igsid}: {body}")
         return {"mock": True}
 
+    # Use graph.instagram.com for IGAAM tokens, otherwise fallback to GRAPH_BASE
+    if access_token and access_token.startswith("IGAAM"):
+        url = "https://graph.instagram.com/v20.0/me/messages"
+    else:
+        url = f"{GRAPH_BASE}/{ig_business_account_id}/messages"
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+
     try:
         resp = httpx.post(
-            f"{GRAPH_BASE}/{ig_business_account_id}/messages",
-            params={"access_token": access_token},
+            url,
+            headers=headers,
             json={
                 "recipient": {"id": recipient_igsid},
                 "message": {"text": body},
@@ -63,10 +74,22 @@ def send_typing_indicator(access_token: str, recipient_id: str):
     if is_mock_mode() or not access_token or access_token == "mock":
         print(f"[MOCK] meta typing indicator -> typing_on for {recipient_id}")
         return
+
+    # Route Instagram tokens to graph.instagram.com
+    if access_token and access_token.startswith("IGAAM"):
+        url = "https://graph.instagram.com/v20.0/me/messages"
+    else:
+        url = f"{GRAPH_BASE}/me/messages"
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+
     try:
         httpx.post(
-            f"{GRAPH_BASE}/me/messages",
-            params={"access_token": access_token},
+            url,
+            headers=headers,
             json={
                 "recipient": {"id": recipient_id},
                 "sender_action": "typing_on",
@@ -75,3 +98,4 @@ def send_typing_indicator(access_token: str, recipient_id: str):
         )
     except Exception as err:
         print(f"[Meta Typing Warning] {err}")
+
