@@ -39,22 +39,28 @@ def get_current_tenant_flexible(
     db: Session = Depends(get_db),
 ):
     """Accepts either a logged-in user's jwt, a tenant api key, or defaults to the master company tenant."""
-    if authorization and authorization.startswith("Bearer "):
+    if authorization is not None:
+        if not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Missing bearer token")
         token = authorization.split(" ", 1)[1]
         try:
             payload = decode_access_token(token)
-            user = db.query(models.User).filter(models.User.id == payload.get("user_id")).first()
-            if user and user.tenant:
-                return user.tenant
-        except Exception:
-            pass
+        except pyjwt.PyJWTError:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        user = db.query(models.User).filter(models.User.id == payload.get("user_id")).first()
+        if not user or not user.tenant:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return user.tenant
 
-    if x_api_key:
+    if x_api_key is not None:
         tenant = crud.get_tenant_by_api_key(db, x_api_key)
-        if tenant:
-            return tenant
+        if not tenant:
+            raise HTTPException(status_code=401, detail="Invalid API key")
+        if not tenant.is_active:
+            raise HTTPException(status_code=403, detail="Tenant is inactive")
+        return tenant
 
-    # Auto-fallback for master company tenant (RAVISN UK)
+    # Auto-fallback for master company tenant (RAVISN UK) when no auth headers are provided
     tenant = db.query(models.Tenant).filter(models.Tenant.slug == "ravisn-uk").first()
     if not tenant:
         tenant = crud.create_tenant(db, "RAVISN UK", "ravisn-uk")

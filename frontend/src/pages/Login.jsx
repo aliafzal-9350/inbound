@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
+import RavisnLogo from "../components/RavisnLogo";
 
 export default function Login() {
   const { login } = useAuth();
@@ -13,9 +14,9 @@ export default function Login() {
 
   // Forgot password modal state
   const [showForgotModal, setShowForgotModal] = useState(false);
-  const [resetEmail, setResetEmail] = useState("");
+  const [forgotEmail, setForgotEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [resetMessage, setResetMessage] = useState("");
+  const [resetSuccess, setResetSuccess] = useState("");
   const [resetError, setResetError] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
 
@@ -36,16 +37,19 @@ export default function Login() {
   async function handleResetPassword(e) {
     e.preventDefault();
     setResetError("");
-    setResetMessage("");
+    setResetSuccess("");
     setResetLoading(true);
     try {
-      const res = await api.resetPassword(resetEmail, newPassword);
-      setResetMessage(res.message || "Password updated successfully! You can now log in.");
+      const res = await api.post("/auth/reset-password", {
+        email: forgotEmail,
+        new_password: newPassword,
+      });
+      setResetSuccess("Password reset successfully! You can now log in with your new password.");
       setTimeout(() => {
-        setEmail(resetEmail);
-        setPassword(newPassword);
         setShowForgotModal(false);
-      }, 1500);
+        setResetSuccess("");
+        setEmail(forgotEmail);
+      }, 2000);
     } catch (err) {
       setResetError(err.message);
     } finally {
@@ -55,26 +59,28 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex">
-      <div className="hidden md:flex md:w-1/2 bg-brand text-white flex-col justify-between p-12">
-        <div className="flex items-center gap-3 font-display text-2xl font-semibold tracking-tight">
-          <img src="/logo.png" alt="AI Assistant" className="w-10 h-10 rounded-xl object-contain bg-white p-1 shadow-lg" />
-          <span>RAVISN</span>
+      <div className="hidden md:flex md:w-1/2 bg-brand-dark text-white flex-col justify-between p-12 border-r border-brand-border-dark">
+        <div>
+          <RavisnLogo variant="light" size="lg" />
         </div>
         <div>
-          <p className="font-display text-3xl leading-snug max-w-sm">
+          <p className="font-display text-3xl leading-snug max-w-sm font-bold">
             One inbox for every customer conversation.
           </p>
-          <p className="text-white/60 mt-4 max-w-sm">
-            WhatsApp, Instagram and Facebook, answered automatically from your own knowledge base.
+          <p className="text-white/60 mt-4 max-w-sm text-sm leading-relaxed">
+            WhatsApp, Instagram, and Facebook Messenger, answered autonomously with strict knowledge-base precision.
           </p>
         </div>
-        <div className="text-white/40 text-sm">RAVISN</div>
+        <div className="text-white/40 text-xs font-mono">RAVISN ENTERPRISE AGENT</div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="flex-1 flex items-center justify-center p-8 bg-brand-bg">
         <div className="w-full max-w-sm">
-          <h1 className="font-display text-2xl font-semibold mb-1">Log in</h1>
-          <p className="text-ink-muted mb-8">Welcome back.</p>
+          <div className="md:hidden mb-6">
+            <RavisnLogo variant="dark" size="md" />
+          </div>
+          <h1 className="font-display text-2xl font-bold mb-1 text-brand-dark">Log in</h1>
+          <p className="text-text-muted text-xs mb-8">Welcome back to your workspace.</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

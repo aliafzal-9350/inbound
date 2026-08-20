@@ -1,24 +1,63 @@
 @import "tailwindcss";
 
+:root {
+  /* Core Brand Tokens */
+  --brand-primary: #0072CE;       /* Electric Azure Blue (from dual chevron arrows) */
+  --brand-primary-hover: #005FA8; /* Deepened Azure */
+  --brand-primary-light: #EBF5FF; /* Subtle Azure Tint for active tabs/badges */
+  
+  --brand-dark: #0B0F19;          /* Obsidian Black (from the 'R' glyph and logotype) */
+  --brand-surface-dark: #111827;  /* Deep Charcoal Slate for Dark Cards */
+  --brand-border-dark: #1F2937;   
+  
+  --brand-bg: #F8FAFC;            /* Clean Off-White Background */
+  --brand-surface: #FFFFFF;       /* Pure White Card Background */
+  --brand-border: #E2E8F0;        /* Subtle divider borders */
+  
+  --text-main: #0B0F19;           /* High-contrast dark typography */
+  --text-muted: #64748B;          /* Slate Secondary typography */
+  --text-inverse: #FFFFFF;        /* Pure White */
+  
+  /* Status Indicators */
+  --status-success: #10B981;      /* Connected / Verified */
+  --status-warning: #F59E0B;      /* Pending / Syncing */
+  --status-error: #EF4444;        /* Disconnected / Failed */
+}
+
 @theme {
-  --color-bg: #f6f7fb;
-  --color-surface: #ffffff;
-  --color-ink: #14162b;
-  --color-ink-muted: #6b7089;
-  --color-line: #e4e5f0;
-  --color-brand: #1b1f3b;
-  --color-accent: #4f46e5;
-  --color-accent-soft: #eef0fe;
-  --color-wa: #0f9d74;
-  --color-ig: #d14d72;
-  --color-fb: #3b6fe0;
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-primary-hover: var(--brand-primary-hover);
+  --color-brand-primary-light: var(--brand-primary-light);
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-surface-dark: var(--brand-surface-dark);
+  --color-brand-border-dark: var(--brand-border-dark);
+  --color-brand-bg: var(--brand-bg);
+  --color-brand-surface: var(--brand-surface);
+  --color-brand-border: var(--brand-border);
+  --color-text-main: var(--text-main);
+  --color-text-muted: var(--text-muted);
+  --color-text-inverse: var(--text-inverse);
+
+  /* Aliases for UI compatibility */
+  --color-bg: var(--brand-bg);
+  --color-surface: var(--brand-surface);
+  --color-ink: var(--text-main);
+  --color-ink-muted: var(--text-muted);
+  --color-line: var(--brand-border);
+  --color-brand: var(--brand-dark);
+  --color-accent: var(--brand-primary);
+  --color-accent-soft: var(--brand-primary-light);
+  --color-wa: #25D366;
+  --color-ig: #E1306C;
+  --color-fb: #0084FF;
 
   --font-display: "Space Grotesk", sans-serif;
   --font-sans: "Inter", sans-serif;
 }
 
 body {
-  background-color: var(--color-bg);
-  color: var(--color-ink);
+  background-color: var(--brand-bg);
+  color: var(--text-main);
   font-family: var(--font-sans);
 }
+

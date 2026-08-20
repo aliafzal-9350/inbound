@@ -51,7 +51,7 @@ def login(payload: schemas.LoginIn, db: Session = Depends(get_db)):
         return schemas.AuthOut(token=token, tenant=tenant, email=user.email)
 
     user = db.query(models.User).filter(models.User.email == email).first()
-    if not user:
+    if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     token = create_access_token(user.id, user.tenant_id)
     return schemas.AuthOut(token=token, tenant=user.tenant, email=user.email)

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import RavisnLogo from "../components/RavisnLogo";
 
 function slugify(text) {
   return text
@@ -15,15 +16,18 @@ export default function Signup() {
   const navigate = useNavigate();
   const [businessName, setBusinessName] = useState("");
   const [slug, setSlug] = useState("");
-  const [slugEdited, setSlugEdited] = useState(false);
+  const [slugManual, setSlugManual] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  function handleBusinessName(value) {
-    setBusinessName(value);
-    if (!slugEdited) setSlug(slugify(value));
+  function handleNameChange(e) {
+    const val = e.target.value;
+    setBusinessName(val);
+    if (!slugManual) {
+      setSlug(slugify(val));
+    }
   }
 
   async function handleSubmit(e) {
@@ -42,26 +46,28 @@ export default function Signup() {
 
   return (
     <div className="min-h-screen flex">
-      <div className="hidden md:flex md:w-1/2 bg-brand text-white flex-col justify-between p-12">
-        <div className="flex items-center gap-3 font-display text-2xl font-semibold tracking-tight">
-          <img src="/logo.png" alt="AI Assistant" className="w-10 h-10 rounded-xl object-contain bg-white p-1 shadow-lg" />
-          <span>RAVISN</span>
+      <div className="hidden md:flex md:w-1/2 bg-brand-dark text-white flex-col justify-between p-12 border-r border-brand-border-dark">
+        <div>
+          <RavisnLogo variant="light" size="lg" />
         </div>
         <div>
-          <p className="font-display text-3xl leading-snug max-w-sm">
+          <p className="font-display text-3xl leading-snug max-w-sm font-bold">
             Set up your business in a couple of minutes.
           </p>
-          <p className="text-white/60 mt-4 max-w-sm">
+          <p className="text-white/60 mt-4 max-w-sm text-sm leading-relaxed">
             Connect WhatsApp, Instagram and Facebook once you're in.
           </p>
         </div>
-        <div className="text-white/40 text-sm">RAVISN</div>
+        <div className="text-white/40 text-xs font-mono">RAVISN ENTERPRISE AGENT</div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="flex-1 flex items-center justify-center p-8 bg-brand-bg">
         <div className="w-full max-w-sm">
-          <h1 className="font-display text-2xl font-semibold mb-1">Create your account</h1>
-          <p className="text-ink-muted mb-8">Free to set up.</p>
+          <div className="md:hidden mb-6">
+            <RavisnLogo variant="dark" size="md" />
+          </div>
+          <h1 className="font-display text-2xl font-bold mb-1 text-brand-dark">Create your account</h1>
+          <p className="text-text-muted text-xs mb-8">Free to set up.</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
