@@ -90,6 +90,11 @@ export const api = {
   getApiKey: () => request("/settings/api-key"),
   saveApiKey: (openai_api_key) =>
     request("/settings/api-key", { method: "POST", body: JSON.stringify({ openai_api_key }) }),
+  getAllApiKeys: () => request("/settings/api-keys"),
+  saveProviderKey: (provider, api_key) =>
+    request(`/settings/api-keys/${provider}`, { method: "POST", body: JSON.stringify({ api_key }) }),
+  deleteProviderKey: (provider) =>
+    request(`/settings/api-keys/${provider}`, { method: "DELETE" }),
   listChannels: () => request("/channels"),
   disconnectChannel: (connectionId) =>
     request(`/channels/${connectionId}/disconnect`, { method: "POST" }),

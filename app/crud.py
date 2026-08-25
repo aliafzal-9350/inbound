@@ -1,4 +1,5 @@
 import datetime
+from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from . import models
 
@@ -7,8 +8,8 @@ def get_tenant_by_api_key(db: Session, api_key: str):
     return db.query(models.Tenant).filter(models.Tenant.api_key == api_key).first()
 
 
-def create_tenant(db: Session, name: str, slug: str):
-    tenant = models.Tenant(name=name, slug=slug)
+def create_tenant(db: Session, name: str, slug: str, business_name: Optional[str] = None):
+    tenant = models.Tenant(name=name, slug=slug, business_name=business_name or name)
     db.add(tenant)
     db.commit()
     db.refresh(tenant)
@@ -85,9 +86,19 @@ def get_active_knowledge(db: Session, tenant_id: str):
     ).all()
 
 
-def add_knowledge(db: Session, tenant_id: str, question: str, answer: str):
+def add_knowledge(db: Session, tenant_id: str, question: str, answer: str, category: str = "general"):
     entry = models.KnowledgeEntry(tenant_id=tenant_id, question=question, answer=answer)
     db.add(entry)
+    
+    # Also add as a knowledge chunk for Hybrid RAG
+    chunk = models.TenantKnowledgeChunk(
+        tenant_id=tenant_id,
+        category=category,
+        chunk_title=question,
+        chunk_content=f"Q: {question}\nA: {answer}",
+    )
+    db.add(chunk)
+    
     db.commit()
     db.refresh(entry)
     return entry
@@ -136,10 +147,16 @@ def get_or_create_conversation(db: Session, tenant_id: str, channel: str, contac
         models.Conversation.contact_external_id == contact_external_id,
     ).first()
     if convo:
+        if contact_name and not convo.contact_name:
+            convo.contact_name = contact_name
+            convo.customer_name = contact_name
+            db.commit()
         return convo
     convo = models.Conversation(
         tenant_id=tenant_id, channel=channel,
         contact_external_id=contact_external_id, contact_name=contact_name,
+        customer_phone_or_id=contact_external_id, customer_name=contact_name,
+        fsm_state="IDLE"
     )
     db.add(convo)
     db.commit()
@@ -147,9 +164,16 @@ def get_or_create_conversation(db: Session, tenant_id: str, channel: str, contac
     return convo
 
 
-def save_message(db: Session, conversation_id: str, direction: str, body: str):
+def save_message(db: Session, conversation_id: str, direction: str, body: str, media_url: Optional[str] = None, audio_transcript: Optional[str] = None):
     now = datetime.datetime.utcnow()
-    msg = models.Message(conversation_id=conversation_id, direction=direction, body=body, created_at=now)
+    msg = models.Message(
+        conversation_id=conversation_id,
+        direction=direction,
+        body=body,
+        media_url=media_url,
+        audio_transcript=audio_transcript,
+        created_at=now
+    )
     db.add(msg)
     convo = db.query(models.Conversation).filter(models.Conversation.id == conversation_id).first()
     if convo:
@@ -158,10 +182,52 @@ def save_message(db: Session, conversation_id: str, direction: str, body: str):
     return msg
 
 
-def create_booking(db: Session, tenant_id: str, channel: str, conversation_id: str, name, contact, preferred_time, notes):
+def update_conversation_fsm(db: Session, conversation_id: str, fsm_state: str, is_escalated: bool = False, escalation_reason: Optional[str] = None, language_pref: Optional[str] = None):
+    convo = db.query(models.Conversation).filter(models.Conversation.id == conversation_id).first()
+    if convo:
+        convo.fsm_state = fsm_state
+        if is_escalated:
+            convo.is_escalated = True
+            convo.escalation_reason = escalation_reason
+        if language_pref:
+            convo.language_preference = language_pref
+        convo.updated_at = datetime.datetime.utcnow()
+        db.commit()
+        db.refresh(convo)
+        return convo
+    return None
+
+
+def create_booking(
+    db: Session,
+    tenant_id: str,
+    channel: str,
+    conversation_id: Optional[str],
+    name: Optional[str],
+    contact: Optional[str],
+    preferred_time: Optional[str],
+    notes: Optional[str],
+    service_name: Optional[str] = None,
+    booking_start_time: Optional[datetime.datetime] = None,
+    booking_end_time: Optional[datetime.datetime] = None,
+    calendar_event_id: Optional[str] = None,
+    status: str = "confirmed"
+):
     booking = models.Booking(
-        tenant_id=tenant_id, channel=channel, conversation_id=conversation_id,
-        name=name, contact=contact, preferred_time=preferred_time, notes=notes,
+        tenant_id=tenant_id,
+        channel=channel,
+        conversation_id=conversation_id,
+        name=name,
+        contact=contact,
+        preferred_time=preferred_time,
+        notes=notes,
+        customer_name=name,
+        customer_phone=contact,
+        service_name=service_name or notes or "General Consultation",
+        booking_start_time=booking_start_time or datetime.datetime.utcnow(),
+        booking_end_time=booking_end_time or (datetime.datetime.utcnow() + datetime.timedelta(minutes=30)),
+        calendar_event_id=calendar_event_id,
+        status=status,
     )
     db.add(booking)
     db.commit()
@@ -171,16 +237,17 @@ def create_booking(db: Session, tenant_id: str, channel: str, conversation_id: s
 
 def get_tenant_system_prompt(db: Session, tenant_id: str) -> str:
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
-    if tenant and tenant.custom_system_prompt:
-        return tenant.custom_system_prompt
+    if tenant and (tenant.system_prompt_override or tenant.custom_system_prompt):
+        return tenant.system_prompt_override or tenant.custom_system_prompt or ""
     return ""
 
 
 def update_tenant_system_prompt(db: Session, tenant_id: str, prompt: str) -> str:
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if tenant:
+        tenant.system_prompt_override = prompt
         tenant.custom_system_prompt = prompt
         db.commit()
         db.refresh(tenant)
-        return tenant.custom_system_prompt or ""
+        return tenant.system_prompt_override or ""
     return ""

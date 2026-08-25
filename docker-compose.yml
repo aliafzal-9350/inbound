@@ -1,42 +1,113 @@
-services:
-  db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: ravisn_agent
-      POSTGRES_USER: ravisn
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ravisn"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+version: '3.8'
 
-  backend:
+services:
+  nginx-proxy:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: always
+    mem_limit: 150m
+    depends_on:
+      - backend-api
+
+  backend-api:
     build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
     env_file: .env
     environment:
-      DATABASE_URL: postgresql://ravisn:${POSTGRES_PASSWORD:-changeme}@db:5432/ravisn_agent
-      WHATSAPP_QR_SERVICE_URL: http://whatsapp-qr-service:3001
-      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-secure_pass}@postgres:5432/${POSTGRES_DB:-ai_agent_db}
+      - REDIS_URL=redis://redis:6379/0
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - CALCOM_API_KEY=${CALCOM_API_KEY}
+      - META_APP_SECRET=${META_APP_SECRET}
+      - WHATSAPP_WEBHOOK_VERIFY_TOKEN=${WHATSAPP_WEBHOOK_VERIFY_TOKEN}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
     depends_on:
-      db:
+      postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
       - "8000:8000"
+    restart: always
+    mem_limit: 600m
+
+  celery-worker:
+    build: .
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-secure_pass}@postgres:5432/${POSTGRES_DB:-ai_agent_db}
+      - REDIS_URL=redis://redis:6379/0
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - CALCOM_API_KEY=${CALCOM_API_KEY}
+      - META_APP_SECRET=${META_APP_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+    mem_limit: 500m
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secure_pass}
+      - POSTGRES_DB=${POSTGRES_DB:-ai_agent_db}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    command: >
+      postgres -c shared_buffers=512MB
+               -c effective_cache_size=1536MB
+               -c work_mem=32MB
+               -c max_connections=100
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+    mem_limit: 1500m
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7.2-alpine
+    command: redis-server --maxmemory 350mb --maxmemory-policy allkeys-lru --appendonly yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+    mem_limit: 450m
+    ports:
+      - "6379:6379"
 
   whatsapp-qr-service:
     build: ./whatsapp-qr-service
     env_file: ./whatsapp-qr-service/.env
     environment:
-      BACKEND_URL: http://backend:8000
+      - BACKEND_URL=http://backend-api:8000
     volumes:
       - qr_sessions:/app/sessions
     depends_on:
-      - backend
+      - backend-api
     ports:
       - "3001:3001"
+    restart: always
+    mem_limit: 200m
 
   frontend:
     build:
@@ -44,10 +115,13 @@ services:
       args:
         VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
     depends_on:
-      - backend
+      - backend-api
     ports:
       - "5173:80"
+    restart: always
+    mem_limit: 100m
 
 volumes:
   pgdata:
+  redisdata:
   qr_sessions:

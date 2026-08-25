@@ -2,8 +2,11 @@ fastapi
 uvicorn[standard]
 sqlalchemy
 pydantic
+pydantic-settings
 python-dotenv
 openai
+google-genai
+groq
 pyjwt
 bcrypt
 httpx
@@ -12,3 +15,7 @@ psycopg2-binary
 pypdf
 python-docx
 python-multipart
+redis
+celery
+pgvector
+opentelemetry-api

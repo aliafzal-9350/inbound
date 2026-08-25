@@ -2,24 +2,50 @@ from dotenv import load_dotenv
 load_dotenv()  # must run before any app module reads os.getenv() at import time
 
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from .database import Base, engine, DATABASE_URL, get_db
-from .routers import tenants, knowledge, chat, auth, conversations, whatsapp_official, whatsapp_qr, meta_messaging, bookings, settings, channels, public_legal
+from .core.database import Base, engine, DATABASE_URL, get_db, init_db_extensions
+from .core.config import settings
+from .core.redis import RedisService
+from .routers import (
+    tenants, knowledge, chat, auth, conversations,
+    whatsapp_official, whatsapp_qr, meta_messaging,
+    bookings, settings as settings_router, channels, public_legal
+)
 
-# Sqlite (local dev): auto-create tables, zero setup needed.
-# Anything else (postgres/production): schema is managed by alembic instead -
-# run `alembic upgrade head` before starting the app. Mixing the two would let
-# create_all silently paper over a migration you forgot to run.
+# Auto-create tables for local sqlite dev or synchronize columns on PostgreSQL
 if DATABASE_URL.startswith("sqlite"):
     Base.metadata.create_all(bind=engine)
+else:
+    try:
+        init_db_extensions(engine)
+    except Exception as e:
+        print(f"[Init Warning] DB extension initialization: {e}")
 
-app = FastAPI(title="RAVISN multi-channel agent")
 
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: attempt pgvector / extensions initialization
+    try:
+        init_db_extensions(engine)
+    except Exception as e:
+        print(f"[Startup Warning] DB extension initialization: {e}")
+    yield
+    # Shutdown
+
+
+app = FastAPI(
+    title="Enterprise AI Response & Autonomous Booking Engine",
+    description="Stateful, voice-aware, trilingual (English, Roman Urdu, Nastaliq Urdu) AI booking platform.",
+    version="2.0.0",
+    lifespan=lifespan
+)
+
+CORS_ORIGINS = settings.CORS_ORIGINS
 origins = ["*"] if CORS_ORIGINS == "*" else [o.strip() for o in CORS_ORIGINS.split(",")]
 
 app.add_middleware(
@@ -34,7 +60,7 @@ app.add_middleware(
 all_routers = [
     auth.router, tenants.router, knowledge.router, chat.router,
     conversations.router, whatsapp_official.router, whatsapp_qr.router,
-    meta_messaging.router, bookings.router, settings.router,
+    meta_messaging.router, bookings.router, settings_router.router,
     channels.router, public_legal.router
 ]
 
@@ -49,7 +75,11 @@ for router in all_routers:
 
 @api_router.get("/")
 def api_root():
-    return {"status": "ok", "service": "ravisn-agent"}
+    return {
+        "status": "ok",
+        "service": "enterprise-ai-booking-engine",
+        "redis_connected": RedisService.is_available(),
+    }
 
 
 @api_router.get("/health")
@@ -59,7 +89,11 @@ def api_health(db: Session = Depends(get_db)):
         db_ok = True
     except Exception:
         db_ok = False
-    return {"status": "ok" if db_ok else "degraded", "database": db_ok}
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "database": db_ok,
+        "redis": RedisService.is_available()
+    }
 
 
 app.include_router(api_router)
@@ -67,7 +101,11 @@ app.include_router(api_router)
 
 @app.get("/")
 def root():
-    return {"status": "ok", "service": "ravisn-agent"}
+    return {
+        "status": "ok",
+        "service": "enterprise-ai-booking-engine",
+        "redis_connected": RedisService.is_available(),
+    }
 
 
 @app.get("/health")
@@ -77,4 +115,8 @@ def health(db: Session = Depends(get_db)):
         db_ok = True
     except Exception:
         db_ok = False
-    return {"status": "ok" if db_ok else "degraded", "database": db_ok}
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "database": db_ok,
+        "redis": RedisService.is_available()
+    }
