@@ -1,7 +1,13 @@
 const getBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_URL;
-  if (envUrl !== undefined && envUrl !== null && envUrl.trim() !== "") {
+  if (envUrl !== undefined && envUrl !== null && envUrl.trim() !== "" && !envUrl.includes("localhost")) {
     return envUrl.trim().replace(/\/$/, "");
+  }
+  if (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+    if (window.location.port === "5173") {
+      return `${window.location.protocol}//${window.location.hostname}:8000`;
+    }
+    return "/api";
   }
   if (import.meta.env.PROD) {
     return "/api";
