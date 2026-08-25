@@ -18,22 +18,25 @@ from .routers import (
 )
 
 # Auto-create tables for local sqlite dev or synchronize columns on PostgreSQL
-if DATABASE_URL.startswith("sqlite"):
+try:
+    init_db_extensions(engine)
+except Exception as e:
+    print(f"[Init Warning] DB extension initialization: {e}")
+
+try:
     Base.metadata.create_all(bind=engine)
-else:
-    try:
-        init_db_extensions(engine)
-    except Exception as e:
-        print(f"[Init Warning] DB extension initialization: {e}")
+except Exception as e:
+    print(f"[Init Warning] DB table auto-creation: {e}")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: attempt pgvector / extensions initialization
+    # Startup: attempt pgvector / extensions and table initialization
     try:
         init_db_extensions(engine)
+        Base.metadata.create_all(bind=engine)
     except Exception as e:
-        print(f"[Startup Warning] DB extension initialization: {e}")
+        print(f"[Startup Warning] DB extension/table initialization: {e}")
     yield
     # Shutdown
 
