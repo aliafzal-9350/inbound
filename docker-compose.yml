@@ -28,6 +28,7 @@ services:
       - CALCOM_API_KEY=${CALCOM_API_KEY}
       - META_APP_SECRET=${META_APP_SECRET}
       - WHATSAPP_WEBHOOK_VERIFY_TOKEN=${WHATSAPP_WEBHOOK_VERIFY_TOKEN}
+      - WHATSAPP_QR_SERVICE_URL=${WHATSAPP_QR_SERVICE_URL:-http://whatsapp-qr-service:3001}
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
     depends_on:
       postgres:
