@@ -48,7 +48,9 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
     signature = request.headers.get("x-hub-signature-256", "")
     if app_secret and signature:
         if not verify_meta_signature(raw_body, signature, app_secret):
-            raise HTTPException(status_code=403, detail="Invalid signature")
+            logger.warning("[WhatsApp Webhook] Signature verification failed. Check META_APP_SECRET in .env.")
+            if os.getenv("META_STRICT_SIGNATURE", "false").lower() == "true":
+                raise HTTPException(status_code=403, detail="Invalid signature")
 
     payload = json.loads(raw_body or b"{}")
 

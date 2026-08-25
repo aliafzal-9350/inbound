@@ -1,6 +1,6 @@
 import re
 import difflib
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 # Full curated multi-lingual dataset provided for RAVISN
 RAVISN_QA_DATA: List[Dict[str, str]] = [
