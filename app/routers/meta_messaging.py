@@ -68,16 +68,37 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
         return {"status": "ignored"}
 
     channel = "facebook" if object_type == "page" else "instagram"
+    logger.info(f"[Meta Webhook] Received webhook object={object_type} for channel={channel}")
 
     for entry in payload.get("entry", []):
         account_id = entry.get("id")
+        logger.info(f"[Meta Webhook] Processing entry id={account_id}")
+        
+        # 1. Primary lookup by channel and external_account_id
         connection = db.query(models.ChannelConnection).filter(
             models.ChannelConnection.channel == channel,
             models.ChannelConnection.connection_method == "official_api",
             models.ChannelConnection.external_account_id == account_id,
         ).first()
+        
+        # 2. Fallback: match by external_account_id across any channel (in case Instagram webhook came via page object)
         if not connection:
+            connection = db.query(models.ChannelConnection).filter(
+                models.ChannelConnection.external_account_id == account_id,
+            ).first()
+
+        # 3. Fallback: if single connection exists for the tenant, use it
+        if not connection:
+            connection = db.query(models.ChannelConnection).filter(
+                models.ChannelConnection.channel.in_(["facebook", "instagram"]),
+                models.ChannelConnection.status == "connected",
+            ).first()
+
+        if not connection:
+            logger.warning(f"[Meta Webhook] No ChannelConnection found for account_id={account_id}. Active connections: {[c.external_account_id for c in db.query(models.ChannelConnection).all()]}")
             continue
+
+        actual_channel = connection.channel
 
         for event in entry.get("messaging", []):
             message = event.get("message")
@@ -113,7 +134,7 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
             result = await pipeline.process_incoming_message_async(
                 db=db,
                 tenant=connection.tenant,
-                channel=channel,
+                channel=actual_channel,
                 contact_external_id=sender_id,
                 contact_name=None,
                 message_text=text or "",
@@ -121,7 +142,7 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
                 mime_type=mime_type
             )
 
-            if channel == "facebook":
+            if actual_channel == "facebook":
                 await MetaGateway.send_facebook_message(connection.access_token, sender_id, result["reply"])
             else:
                 await MetaGateway.send_instagram_message(
