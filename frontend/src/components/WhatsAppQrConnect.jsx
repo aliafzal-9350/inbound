@@ -20,12 +20,16 @@ export default function WhatsAppQrConnect() {
       try {
         const s = await api.getWhatsAppQrStatus();
         setStatus(s.status);
-        if (s.qr) setQr(s.qr);
+        if (s.qr) {
+          setQr(s.qr);
+        } else if (s.status === "connected" || s.status === "disconnected") {
+          setQr(null);
+        }
         if (s.status === "connected") {
           stopPolling();
         }
       } catch {
-        stopPolling();
+        // Keep polling through transient network errors
       }
     }, 1000);
   }

@@ -1,8 +1,9 @@
 import os
 import httpx
+from ..core.config import settings
 
 def _get_url() -> str:
-    return os.getenv("WHATSAPP_QR_SERVICE_URL") or "http://whatsapp-qr-service:3001"
+    return settings.WHATSAPP_QR_SERVICE_URL or os.getenv("WHATSAPP_QR_SERVICE_URL") or "http://127.0.0.1:3001"
 
 
 def start_session(tenant_id: str) -> dict:
