@@ -23,7 +23,7 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
 
   function handleNameChange(e) {
-    const val = e.target.value;
+    const val = typeof e === "string" ? e : e?.target?.value ?? "";
     setBusinessName(val);
     if (!slugManual) {
       setSlug(slugify(val));
@@ -78,7 +78,7 @@ export default function Signup() {
                 id="business"
                 required
                 value={businessName}
-                onChange={(e) => handleBusinessName(e.target.value)}
+                onChange={handleNameChange}
                 className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-accent focus:ring-2 focus:ring-accent-soft transition"
                 placeholder="Bright Smile Clinic"
               />
@@ -93,7 +93,7 @@ export default function Signup() {
                 value={slug}
                 onChange={(e) => {
                   setSlug(slugify(e.target.value));
-                  setSlugEdited(true);
+                  setSlugManual(true);
                 }}
                 className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-accent focus:ring-2 focus:ring-accent-soft transition font-mono text-sm"
                 placeholder="bright-smile-clinic"
