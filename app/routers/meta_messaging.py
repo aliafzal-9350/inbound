@@ -10,6 +10,7 @@ from ..database import get_db
 from ..auth import get_current_tenant_flexible
 from ..services.meta_gateway import MetaGateway
 from ..core.security import verify_meta_signature
+from ..core.redis import claim_webhook_event
 
 logger = logging.getLogger(__name__)
 
@@ -128,25 +129,30 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
             if not text and not audio_bytes:
                 continue
 
-            # Send typing_on indicator
-            await MetaGateway.send_typing_indicator(connection.access_token, sender_id)
+            with claim_webhook_event(message.get("mid")) as first_delivery:
+                if not first_delivery:
+                    logger.warning(f"[Meta Webhook] Duplicate delivery of mid={message.get('mid')} skipped")
+                    continue
 
-            result = await pipeline.process_incoming_message_async(
-                db=db,
-                tenant=connection.tenant,
-                channel=actual_channel,
-                contact_external_id=sender_id,
-                contact_name=None,
-                message_text=text or "",
-                audio_bytes=audio_bytes,
-                mime_type=mime_type
-            )
+                # Send typing_on indicator
+                await MetaGateway.send_typing_indicator(connection.access_token, sender_id)
 
-            if actual_channel == "facebook":
-                await MetaGateway.send_facebook_message(connection.access_token, sender_id, result["reply"])
-            else:
-                await MetaGateway.send_instagram_message(
-                    connection.external_account_id, connection.access_token, sender_id, result["reply"]
+                result = await pipeline.process_incoming_message_async(
+                    db=db,
+                    tenant=connection.tenant,
+                    channel=actual_channel,
+                    contact_external_id=sender_id,
+                    contact_name=None,
+                    message_text=text or "",
+                    audio_bytes=audio_bytes,
+                    mime_type=mime_type
                 )
+
+                if actual_channel == "facebook":
+                    await MetaGateway.send_facebook_message(connection.access_token, sender_id, result["reply"])
+                else:
+                    await MetaGateway.send_instagram_message(
+                        connection.external_account_id, connection.access_token, sender_id, result["reply"]
+                    )
 
     return {"status": "ok"}

@@ -191,6 +191,27 @@ class RedisService:
 
 
 @contextmanager
+def claim_webhook_event(event_id: Optional[str], ttl: int = 86400):
+    """Yields True only for the first delivery of a webhook event id.
+
+    Meta re-delivers the same message on retries (any non-200) and can deliver it twice
+    concurrently, which produced duplicate AI replies. If processing raises, the claim is
+    released so Meta's retry can still get the message handled.
+    """
+    if not event_id:
+        yield True
+        return
+    lock_key = f"webhook_event:{event_id}"
+    claimed = RedisService.acquire_lock(lock_key, ttl_seconds=ttl)
+    try:
+        yield claimed
+    except BaseException:
+        if claimed:
+            RedisService.release_lock(lock_key)
+        raise
+
+
+@contextmanager
 def session_lock(tenant_id: str, user_id: str, ttl: int = 8):
     """Context manager for acquiring and releasing a session mutex lock."""
     lock_key = f"tenant:{tenant_id}:user:{user_id}"

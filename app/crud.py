@@ -1,5 +1,6 @@
 import datetime
 from typing import Optional, List, Dict, Any
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from . import models
 
@@ -159,7 +160,16 @@ def get_or_create_conversation(db: Session, tenant_id: str, channel: str, contac
         fsm_state="IDLE"
     )
     db.add(convo)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # A concurrent request created this contact's conversation first (uq_tenant_channel_contact).
+        db.rollback()
+        return db.query(models.Conversation).filter(
+            models.Conversation.tenant_id == tenant_id,
+            models.Conversation.channel == channel,
+            models.Conversation.contact_external_id == contact_external_id,
+        ).one()
     db.refresh(convo)
     return convo
 

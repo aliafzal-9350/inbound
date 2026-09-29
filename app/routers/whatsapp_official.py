@@ -10,6 +10,7 @@ from ..database import get_db
 from ..auth import get_current_tenant_flexible
 from ..services.meta_gateway import MetaGateway
 from ..core.security import verify_meta_signature
+from ..core.redis import claim_webhook_event
 
 logger = logging.getLogger(__name__)
 
@@ -97,23 +98,28 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
                 else:
                     continue
 
-                # Run through the pipeline
-                result = await pipeline.process_incoming_message_async(
-                    db=db,
-                    tenant=connection.tenant,
-                    channel="whatsapp",
-                    contact_external_id=sender,
-                    contact_name=contact_name,
-                    message_text=text,
-                    audio_bytes=audio_bytes,
-                    mime_type=mime_type
-                )
+                with claim_webhook_event(msg.get("id")) as first_delivery:
+                    if not first_delivery:
+                        logger.warning(f"[WhatsApp Webhook] Duplicate delivery of id={msg.get('id')} skipped")
+                        continue
 
-                await MetaGateway.send_whatsapp_message(
-                    phone_number_id=connection.external_account_id,
-                    access_token=connection.access_token,
-                    to_phone=sender,
-                    message_text=result["reply"]
-                )
+                    # Run through the pipeline
+                    result = await pipeline.process_incoming_message_async(
+                        db=db,
+                        tenant=connection.tenant,
+                        channel="whatsapp",
+                        contact_external_id=sender,
+                        contact_name=contact_name,
+                        message_text=text,
+                        audio_bytes=audio_bytes,
+                        mime_type=mime_type
+                    )
+
+                    await MetaGateway.send_whatsapp_message(
+                        phone_number_id=connection.external_account_id,
+                        access_token=connection.access_token,
+                        to_phone=sender,
+                        message_text=result["reply"]
+                    )
 
     return {"status": "ok"}
