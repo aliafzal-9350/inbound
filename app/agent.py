@@ -1,8 +1,64 @@
 import os
+import re
 import json
 import asyncio
 from typing import List, Dict, Any, Optional
 from . import models
+
+
+def extract_qa_from_text(text: str, max_chars: int = 1200) -> List[Dict[str, str]]:
+    """Turns an uploaded document (PDF/DOCX/TXT) into knowledge entries.
+
+    FAQ-style text (a line ending in "?" followed by its answer) becomes one entry per question.
+    Anything else is split into ~max_chars sections titled by their heading. Entries are embedded for
+    semantic search afterwards, so no LLM call (or quota) is spent at upload time.
+    """
+    lines = [re.sub(r"\s+", " ", ln).strip() for ln in (text or "").splitlines()]
+
+    # 1. FAQ layout
+    pairs: List[Dict[str, str]] = []
+    question, answer = None, []
+    for ln in lines:
+        bare = re.sub(r"^(q(uestion)?|a(nswer)?)\s*[:.)-]\s*", "", ln, flags=re.I)
+        if ln.endswith("?") and len(ln) <= 200:
+            if question and answer:
+                pairs.append({"question": question, "answer": " ".join(answer)})
+            question, answer = bare, []
+        elif ln and question:
+            answer.append(bare)
+    if question and answer:
+        pairs.append({"question": question, "answer": " ".join(answer)})
+    faq_chars = sum(len(p["question"]) + len(p["answer"]) for p in pairs)
+    if len(pairs) >= 3 and faq_chars >= 0.6 * sum(len(ln) for ln in lines):
+        return pairs
+
+    # 2. Sections: a short line without final punctuation followed by text is treated as a heading
+    sections: List[Dict[str, str]] = []
+    heading, buf = None, []
+
+    def flush():
+        body = " ".join(buf).strip()
+        while body:
+            if len(body) <= max_chars:
+                part, body = body, ""
+            else:
+                cut = body.rfind(". ", 0, max_chars)
+                cut = cut + 1 if cut > max_chars // 2 else max_chars
+                part, body = body[:cut].strip(), body[cut:].strip()
+            title = heading or (part.split(". ")[0][:80] + ("..." if len(part.split(". ")[0]) > 80 else ""))
+            sections.append({"question": title, "answer": part})
+
+    for i, ln in enumerate(lines):
+        if not ln:
+            continue
+        nxt = next((l for l in lines[i + 1:] if l), "")
+        if len(ln) <= 70 and not re.search(r"[.,;:!?]$", ln) and nxt and len(nxt) > len(ln):
+            flush()
+            heading, buf = ln, []
+        else:
+            buf.append(ln)
+    flush()
+    return sections
 from .services.rag_engine import HybridRAGEngine
 from .services.llm_engine import LLMEngine, LinguisticNormalizer
 from .services.intent_router import is_pure_greeting
