@@ -115,6 +115,8 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
                         mime_type=mime_type
                     )
 
+                    if not result["reply"]:
+                        continue  # folded into a newer message from the same customer
                     await MetaGateway.send_whatsapp_message(
                         phone_number_id=connection.external_account_id,
                         access_token=connection.access_token,

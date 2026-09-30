@@ -1,7 +1,7 @@
 import uuid
 import datetime
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Boolean, Index
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, deferred
 from ..core.database import Base
 
 try:
@@ -39,6 +39,10 @@ class KnowledgeEntry(Base):
     question = Column(Text, nullable=False)
     answer = Column(Text, nullable=False)
     is_active = Column(Boolean, default=True)
+    # Semantic search vector (deferred: dashboard listings never load it). embedding_hash is
+    # sha1(model signature + question + answer), so an edited entry is re-embedded automatically.
+    embedding = deferred(Column(VectorType, nullable=True))
+    embedding_hash = Column(String(64), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 

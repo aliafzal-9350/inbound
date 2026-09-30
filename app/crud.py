@@ -174,7 +174,8 @@ def get_or_create_conversation(db: Session, tenant_id: str, channel: str, contac
     return convo
 
 
-def save_message(db: Session, conversation_id: str, direction: str, body: str, media_url: Optional[str] = None, audio_transcript: Optional[str] = None):
+def save_message(db: Session, conversation_id: str, direction: str, body: str, media_url: Optional[str] = None,
+                 audio_transcript: Optional[str] = None, convo: Optional[models.Conversation] = None):
     now = datetime.datetime.utcnow()
     msg = models.Message(
         conversation_id=conversation_id,
@@ -185,7 +186,8 @@ def save_message(db: Session, conversation_id: str, direction: str, body: str, m
         created_at=now
     )
     db.add(msg)
-    convo = db.query(models.Conversation).filter(models.Conversation.id == conversation_id).first()
+    if convo is None:  # pass the loaded conversation to skip a round trip
+        convo = db.query(models.Conversation).filter(models.Conversation.id == conversation_id).first()
     if convo:
         convo.last_message_at = now
     db.commit()

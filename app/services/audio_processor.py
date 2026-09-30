@@ -67,10 +67,12 @@ class AudioProcessor:
     async def transcribe_groq_whisper(audio_bytes: bytes, filename: str = "audio.wav") -> Tuple[str, float]:
         """Transcribes audio using Groq Whisper Large-v3 API (`whisper-large-v3`).
         Returns (transcript_text, confidence_score)."""
-        groq_api_key = settings.GROQ_API_KEY
+        from ..core.api_keys import get_key
+        groq_api_key = get_key("GROQ_API_KEY")
         if not groq_api_key:
-            logger.warning("GROQ_API_KEY not configured. Returning mock transcription.")
-            return "Salam mujhe appointment leni hai", 0.95
+            # never invent a transcript: the agent would answer words the customer didn't say
+            logger.warning("GROQ_API_KEY not configured; voice note left untranscribed.")
+            return "", 0.0
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:

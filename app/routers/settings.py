@@ -21,18 +21,39 @@ _PROVIDER_ENV_MAP = {
 }
 
 _PROVIDER_LABELS = {
-    "openai": "OpenAI",
-    "gemini": "Google Gemini",
-    "groq": "Groq (Llama-3.3)",
-    "xai": "xAI (Grok)",
+    "openai": "OpenAI (not used)",
+    "gemini": "Google Gemini (knowledge search only)",
+    "groq": "Groq (main AI brain)",
+    "xai": "xAI Grok (not used)",
 }
 
 _PROVIDER_MODELS = {
-    "openai": "gpt-4o-mini",
-    "gemini": "gemini-2.5-flash",
-    "groq": "llama-3.3-70b-versatile",
-    "xai": "grok-3-mini",
+    "openai": "-",
+    "gemini": "gemini-embedding-001",
+    "groq": "qwen/qwen3.8-27b + openai/gpt-oss-120b",
+    "xai": "-",
 }
+
+
+def _verify_groq_key(key: str) -> None:
+    """Rejects a Groq key that Groq itself refuses, so a typo can't take the agent offline."""
+    import httpx
+    try:
+        resp = httpx.get("https://api.groq.com/openai/v1/models",
+                         headers={"Authorization": f"Bearer {key}"}, timeout=15)
+    except Exception:
+        return  # Groq unreachable right now: accept the key rather than block the update
+    if resp.status_code in (401, 403):
+        raise HTTPException(status_code=400, detail="Groq rejected this API key. Please check it and try again.")
+
+
+def _save_key(env_var: str, value: Optional[str]) -> None:
+    """Applies a key to all workers now (Redis) and to .env for the next restart."""
+    from ..core.api_keys import set_key
+    if env_var == "GROQ_API_KEY" and value:
+        _verify_groq_key(value)
+    set_key(env_var, value)
+    _write_env_key(env_var, value)
 
 
 def _mask(key: str) -> str:
@@ -82,20 +103,12 @@ class ApiKeyUpdate(BaseModel):
 
 @router.get("/api-key")
 def get_api_key(tenant: models.Tenant = Depends(get_current_tenant_flexible)):
-    groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
-    gemini_key = (os.getenv("GEMINI_API_KEY") or "").strip()
-    openai_key = (os.getenv("OPENAI_API_KEY") or "").strip()
-    key = groq_key or gemini_key or openai_key
+    from ..core.api_keys import get_key
+    key = get_key("GROQ_API_KEY") or ""
     if not key:
         return {"configured": False, "masked_key": "", "provider": "none"}
-    if groq_key or key.startswith("gsk_"):
-        provider = "Groq Llama-3.3 (100% Free)"
-    elif key.startswith("sk-"):
-        provider = "OpenAI"
-    else:
-        provider = "Google Gemini (100% Free)"
     masked = key[:7] + "..." + key[-4:] if len(key) > 11 else "****"
-    return {"configured": True, "masked_key": masked, "provider": provider}
+    return {"configured": True, "masked_key": masked, "provider": _PROVIDER_LABELS["groq"]}
 
 
 @router.post("/api-key")
@@ -105,17 +118,13 @@ def update_api_key(payload: ApiKeyUpdate, tenant: models.Tenant = Depends(get_cu
         raise HTTPException(status_code=400, detail="API Key cannot be empty")
 
     if new_key.startswith("gsk_"):
-        provider = "Groq Llama-3.3 (100% Free)"
-        key_name = "GROQ_API_KEY"
+        provider, key_name = _PROVIDER_LABELS["groq"], "GROQ_API_KEY"
     elif new_key.startswith("sk-"):
-        provider = "OpenAI"
-        key_name = "OPENAI_API_KEY"
+        provider, key_name = _PROVIDER_LABELS["openai"], "OPENAI_API_KEY"
     else:
-        provider = "Google Gemini (100% Free)"
-        key_name = "GEMINI_API_KEY"
+        provider, key_name = _PROVIDER_LABELS["gemini"], "GEMINI_API_KEY"
 
-    os.environ[key_name] = new_key
-    _write_env_key(key_name, new_key)
+    _save_key(key_name, new_key)
 
     masked = _mask(new_key)
     return {
@@ -134,9 +143,10 @@ def update_api_key(payload: ApiKeyUpdate, tenant: models.Tenant = Depends(get_cu
 @router.get("/api-keys")
 def get_all_api_keys(tenant: models.Tenant = Depends(get_current_tenant_flexible)):
     """Return masked status for all four AI providers."""
+    from ..core.api_keys import get_key
     result = {}
     for provider_id, env_var in _PROVIDER_ENV_MAP.items():
-        raw = (os.getenv(env_var) or "").strip()
+        raw = get_key(env_var) or ""
         result[provider_id] = {
             "provider": provider_id,
             "label": _PROVIDER_LABELS[provider_id],
@@ -167,8 +177,7 @@ def save_provider_key(
         raise HTTPException(status_code=400, detail="API key cannot be empty")
 
     env_var = _PROVIDER_ENV_MAP[provider]
-    os.environ[env_var] = new_key
-    _write_env_key(env_var, new_key)
+    _save_key(env_var, new_key)
 
     return {
         "status": "ok",
@@ -190,8 +199,7 @@ def delete_provider_key(
         raise HTTPException(status_code=400, detail=f"Unknown provider '{provider}'. Valid: openai, gemini, groq, xai")
 
     env_var = _PROVIDER_ENV_MAP[provider]
-    os.environ.pop(env_var, None)
-    _write_env_key(env_var, None)  # removes the line from .env
+    _save_key(env_var, None)  # removes it from Redis and .env
 
     return {
         "status": "ok",
@@ -272,90 +280,32 @@ async def test_system_prompt(
     db: Session = Depends(get_db),
     tenant: models.Tenant = Depends(get_current_tenant_flexible)
 ):
-    from ..services.llm_engine import LLMEngine
-    from ..services.rag_engine import HybridRAGEngine
-    from ..services.intent_router import is_pure_greeting, generate_instant_greeting_reply
-    from ..services.ravisn_knowledge_base import RAVISNKnowledgeEngine, BookingDialogManager
+    """Runs one message through the real sales agent with the (unsaved) prompt. Dry run: the
+    conversation is never saved and no booking or staff alert is triggered."""
+    from types import SimpleNamespace
+    from ..services import sales_agent
 
-    custom_prompt = payload.system_prompt.strip()
-    msg = payload.message.strip()
-    tenant_name = tenant.business_name or getattr(tenant, "name", None) or "RAVISN"
-
-    import re
-    lang = "urdu_nastaliq" if re.search(r"[\u0600-\u06FF]", msg) else ("roman_urdu" if any(k in msg.lower() for k in ["salam", "assalam", "asslamualikom", "aoa", "kya", "hai", "kese", "kaise", "chahiye", "karwana"]) else "english")
-
-    # 1. Instant sub-5ms fast path for greetings
-    if is_pure_greeting(msg):
-        fast_reply = generate_instant_greeting_reply(msg, tenant_name)
-        return {
-            "reply": fast_reply,
-            "assistant_reply": fast_reply,
-            "language": lang,
-            "intent": "greeting",
-            "booking_ready": False,
-            "booking_info": {"name": None, "contact": None, "preferred_time": None, "service": None},
-            "evidence_used": False
-        }
-
-
-
-    # 3. Interactive Multi-Step Demo / Consultation Booking Flow
-    if BookingDialogManager.detect_booking_intent(msg):
-        reply_text, next_step, updated_slots, is_complete = BookingDialogManager.process_turn(
-            user_message=msg,
-            current_step="idle",
-            booking_data={},
-            language=lang,
-            db_session=db,
-            tenant_id=tenant.id
-        )
-        return {
-            "reply": reply_text,
-            "assistant_reply": reply_text,
-            "language": lang,
-            "intent": "booking_request",
-            "booking_ready": is_complete,
-            "booking_info": {
-                "name": updated_slots.get("name"),
-                "contact": updated_slots.get("email") or "+1 (564) 222-6889",
-                "preferred_time": updated_slots.get("preferred_time"),
-                "service": updated_slots.get("service_needed") or "AI Automation Consultation"
-            },
-            "evidence_used": True
-        }
-
-    # 4. Dynamic Hybrid RAG + Local LLM Generation
-    chunks = HybridRAGEngine.search(db, tenant.id, msg, top_k=3)
-    evidence_pack = HybridRAGEngine.build_evidence_pack(chunks)
-
-    inf_output = await LLMEngine.generate_single_pass_inference(
-        tenant_name=tenant_name,
-        timezone=getattr(tenant, "default_timezone", None) or getattr(tenant, "timezone", None) or "Asia/Karachi",
-        fsm_state="SIMULATION",
-        collected_slots={},
-        available_slots=[],
-        evidence_pack=evidence_pack,
-        conversation_history=[],
-        user_message=msg,
-        system_prompt_override=custom_prompt
+    trial_tenant = SimpleNamespace(
+        id=tenant.id, business_name=tenant.business_name, name=getattr(tenant, "name", None),
+        default_timezone=getattr(tenant, "default_timezone", None),
+        system_prompt_override=payload.system_prompt.strip() or None, custom_system_prompt=None,
     )
-
-    slots = inf_output.extracted_slots
-    is_booking = inf_output.detected_intent in ("booking", "booking_request") or bool(slots.customer_name or slots.preferred_time)
-
+    convo = models.Conversation(tenant_id=tenant.id, channel="web", contact_external_id="system-prompt-test")
+    turn = await sales_agent.handle_turn(db, trial_tenant, convo, "web", payload.message.strip(), [], dry_run=True)
+    lead = (convo.agent_state or {}).get("lead", {})
     return {
-        "reply": inf_output.assistant_reply,
-        "assistant_reply": inf_output.assistant_reply,
-        "language": inf_output.detected_language,
-        "intent": inf_output.detected_intent,
-        "booking_ready": is_booking,
+        "reply": turn.reply,
+        "assistant_reply": turn.reply,
+        "language": turn.language,
+        "intent": ",".join(turn.intents),
+        "booking_ready": False,
         "booking_info": {
-            "name": slots.customer_name,
-            "contact": slots.customer_phone or slots.customer_email,
-            "preferred_time": f"{slots.preferred_date or ''} {slots.preferred_time or ''}".strip() or None,
-            "service": slots.service_name
+            "name": lead.get("name"),
+            "contact": lead.get("email") or lead.get("phone"),
+            "preferred_time": lead.get("meeting_time"),
+            "service": lead.get("goal"),
         },
-        "evidence_used": bool(evidence_pack)
+        "evidence_used": not turn.degraded,
     }
 
 

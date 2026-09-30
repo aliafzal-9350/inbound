@@ -1,6 +1,6 @@
 import uuid
 import datetime
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Boolean, UniqueConstraint
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Boolean, UniqueConstraint, JSON
 from sqlalchemy.orm import relationship
 from ..core.database import Base
 
@@ -28,6 +28,8 @@ class Conversation(Base):
     fsm_state = Column(String(50), default="IDLE")
     is_escalated = Column(Boolean, default=False)
     escalation_reason = Column(Text, nullable=True)
+    # Sales agent memory: lead details collected so far, stage, pending booking (see services/sales_agent.py)
+    agent_state = Column(JSON, nullable=True)
     
     last_message_at = Column(DateTime, default=datetime.datetime.utcnow)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)

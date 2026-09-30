@@ -19,3 +19,4 @@ redis
 celery
 pgvector
 opentelemetry-api
+tzdata

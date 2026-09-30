@@ -37,7 +37,12 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine)
     except Exception as e:
         print(f"[Startup Warning] DB extension/table initialization: {e}")
+    # Embed knowledge entries in the background (rate-limit aware) so searches are semantic from turn one
+    import asyncio
+    from .services.knowledge_retriever import backfill_all_tenants
+    backfill_task = asyncio.create_task(backfill_all_tenants())
     yield
+    backfill_task.cancel()
     # Shutdown
 
 

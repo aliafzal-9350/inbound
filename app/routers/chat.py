@@ -14,10 +14,11 @@ def test_message(
     tenant: models.Tenant = Depends(get_current_tenant_flexible),
 ):
     result = pipeline.process_incoming_message(
-        db, tenant, payload.channel, payload.contact_external_id, payload.contact_name, payload.message
+        db, tenant, payload.channel, payload.contact_external_id, payload.contact_name, payload.message,
+        debounce=False,
     )
     return schemas.TestMessageOut(
-        reply=result["reply"],
+        reply=result["reply"] or "",
         booking_created=result["booking_created"],
         booking_info=result["booking_info"],
     )

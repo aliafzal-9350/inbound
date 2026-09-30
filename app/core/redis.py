@@ -152,6 +152,60 @@ class RedisService:
         _in_memory_expiry.pop(key, None)
 
     @staticmethod
+    def get_config(name: str) -> Optional[str]:
+        """Persistent runtime setting (e.g. an API key saved from the dashboard)."""
+        if _REDIS_AVAILABLE and _redis_client:
+            try:
+                return _redis_client.get(f"config:{name}")
+            except Exception as e:
+                logger.error(f"Redis get_config failed: {e}")
+        return _in_memory_store.get(f"config:{name}")
+
+    @staticmethod
+    def set_config(name: str, value: Optional[str]) -> None:
+        """Stores (or with value=None deletes) a persistent runtime setting."""
+        if _REDIS_AVAILABLE and _redis_client:
+            try:
+                if value is None:
+                    _redis_client.delete(f"config:{name}")
+                else:
+                    _redis_client.set(f"config:{name}", value)
+                return
+            except Exception as e:
+                logger.error(f"Redis set_config failed: {e}")
+        if value is None:
+            _in_memory_store.pop(f"config:{name}", None)
+        else:
+            _in_memory_store[f"config:{name}"] = value
+
+    @staticmethod
+    def bump_counter(key: str, ttl_seconds: int = 120) -> int:
+        """Atomically increments a counter (used to detect a newer message in the same burst)."""
+        if _REDIS_AVAILABLE and _redis_client:
+            try:
+                pipe = _redis_client.pipeline()
+                pipe.incr(f"counter:{key}")
+                pipe.expire(f"counter:{key}", ttl_seconds)
+                return int(pipe.execute()[0])
+            except Exception as e:
+                logger.error(f"Redis bump_counter failed: {e}")
+        _clean_expired_in_memory()
+        value = int(_in_memory_store.get(f"counter:{key}", 0)) + 1
+        _in_memory_store[f"counter:{key}"] = value
+        _in_memory_expiry[f"counter:{key}"] = time.time() + ttl_seconds
+        return value
+
+    @staticmethod
+    def get_counter(key: str) -> int:
+        if _REDIS_AVAILABLE and _redis_client:
+            try:
+                return int(_redis_client.get(f"counter:{key}") or 0)
+            except Exception as e:
+                logger.error(f"Redis get_counter failed: {e}")
+        _clean_expired_in_memory()
+        return int(_in_memory_store.get(f"counter:{key}", 0))
+
+    @staticmethod
     def set_session_state(tenant_id: str, user_id: str, state_dict: Dict[str, Any], ttl_seconds: int = 3600) -> None:
         """Stores active conversation slot state in Redis."""
         key = f"session_state:{tenant_id}:{user_id}"
@@ -188,6 +242,24 @@ class RedisService:
             except Exception:
                 pass
         return {}
+
+
+@asynccontextmanager
+async def conversation_turn_lock(key: str, wait_seconds: float = 30.0, ttl: int = 60):
+    """Serializes turns of one conversation: waits (non-blocking) for the previous reply to finish.
+    Proceeds without the lock after wait_seconds rather than dropping the customer's message."""
+    import asyncio
+    lock_key = f"turn:{key}"
+    deadline = time.time() + wait_seconds
+    acquired = RedisService.acquire_lock(lock_key, ttl_seconds=ttl)
+    while not acquired and time.time() < deadline:
+        await asyncio.sleep(0.25)
+        acquired = RedisService.acquire_lock(lock_key, ttl_seconds=ttl)
+    try:
+        yield acquired
+    finally:
+        if acquired:
+            RedisService.release_lock(lock_key)
 
 
 @contextmanager

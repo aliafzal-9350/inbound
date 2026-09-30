@@ -103,3 +103,18 @@ def init_db_extensions(db_engine=engine):
                 conn.rollback()
                 print(f"[DB Schema Notice] {e}")
 
+            # Sales agent: semantic search vectors on FAQ entries + per-conversation memory
+            agent_sql = """
+                ALTER TABLE knowledge_base ADD COLUMN IF NOT EXISTS embedding vector(1536);
+                ALTER TABLE knowledge_base ADD COLUMN IF NOT EXISTS embedding_hash VARCHAR(64);
+                CREATE INDEX IF NOT EXISTS ix_knowledge_base_embedding
+                    ON knowledge_base USING hnsw (embedding vector_cosine_ops);
+                ALTER TABLE conversations ADD COLUMN IF NOT EXISTS agent_state JSON;
+            """
+            try:
+                conn.execute(text(agent_sql))
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                print(f"[DB Schema Notice] agent columns: {e}")
+

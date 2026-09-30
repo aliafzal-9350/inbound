@@ -148,6 +148,8 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
                     mime_type=mime_type
                 )
 
+                if not result["reply"]:
+                    continue  # folded into a newer message from the same customer
                 if actual_channel == "facebook":
                     await MetaGateway.send_facebook_message(connection.access_token, sender_id, result["reply"])
                 else:

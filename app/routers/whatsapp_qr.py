@@ -141,6 +141,8 @@ def qr_message_webhook(
         raise HTTPException(status_code=404, detail="Unknown tenant")
 
     result = pipeline.process_incoming_message(db, tenant, "whatsapp", payload.sender, payload.name, payload.text)
+    if not result["reply"]:
+        return {"status": "ok"}  # folded into a newer message from the same customer
 
     try:
         whatsapp_qr.send_message(tenant.id, payload.sender, result["reply"])

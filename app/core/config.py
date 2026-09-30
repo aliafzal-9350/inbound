@@ -28,15 +28,27 @@ class Settings(BaseSettings):
     # LLM & AI Providers
     OPENAI_API_KEY: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
     OPENAI_MODEL: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL")
+    # Groq is the agent's only AI for thinking and writing. Each tier walks its own model list when a
+    # model is rate-limited (Groq limits are per model). Writer = Qwen: in tests it was the only Groq model
+    # that answers Roman Urdu in Latin letters (GPT-OSS switched to Hindi script).
     GROQ_API_KEY: Optional[str] = Field(default=None, alias="GROQ_API_KEY")
-    GROQ_MODEL: str = Field(default="llama-3.3-70b-versatile", alias="GROQ_MODEL")
+    GROQ_MODEL: str = Field(default="qwen/qwen3.8-27b", alias="GROQ_MODEL")
+    GROQ_SMART_FALLBACKS: str = Field(default="openai/gpt-oss-120b,openai/gpt-oss-20b", alias="GROQ_SMART_FALLBACKS")
+    GROQ_FAST_MODEL: str = Field(default="openai/gpt-oss-120b", alias="GROQ_FAST_MODEL")
+    GROQ_FAST_FALLBACKS: str = Field(default="qwen/qwen3.8-27b,openai/gpt-oss-20b", alias="GROQ_FAST_FALLBACKS")
     GROQ_WHISPER_MODEL: str = Field(default="whisper-large-v3", alias="GROQ_WHISPER_MODEL")
+    # Gemini is used ONLY for knowledge-search embeddings (Groq has no embedding API); it never writes replies.
     GEMINI_API_KEY: Optional[str] = Field(default=None, alias="GEMINI_API_KEY")
-    GEMINI_MODEL: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
+    GEMINI_EMBED_MODEL: str = Field(default="gemini-embedding-001", alias="GEMINI_EMBED_MODEL")
+    EMBEDDING_DIM: int = 1536  # must match the vector(1536) columns
     XAI_API_KEY: Optional[str] = Field(default=None, alias="XAI_API_KEY")
     XAI_MODEL: str = Field(default="grok-3-mini", alias="XAI_MODEL")
 
     # Semantic RAG Configuration
+    # Floor on cosine similarity (gemini-embedding-001, normalized) for a knowledge entry to be shown to the reply
+    # model as a candidate. Calibrated on the RAVISN FAQ: answerable questions score 0.61-0.81 but unrelated ones
+    # reach ~0.70 against generic entries, so this only drops clear misses; the reply model judges the rest.
+    RAG_MIN_DENSE_SCORE: float = Field(default=0.55, alias="RAG_MIN_DENSE_SCORE")
     RAG_SIMILARITY_THRESHOLD: float = Field(default=0.25, alias="RAG_SIMILARITY_THRESHOLD")
     RAG_TOP_K: int = Field(default=4, alias="RAG_TOP_K")
     RAG_MAX_CONTEXT_CHUNKS: int = Field(default=5, alias="RAG_MAX_CONTEXT_CHUNKS")
