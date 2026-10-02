@@ -16,14 +16,14 @@ def list_bookings(
     tenant: models.Tenant = Depends(get_current_tenant_flexible),
 ):
     q = db.query(models.Booking).filter(
-        (models.Booking.tenant_id == tenant.id) | (models.Booking.tenant_id == "default")
+        models.Booking.tenant_id == tenant.id
     )
     if channel:
         q = q.filter(models.Booking.channel == channel)
     bookings = q.order_by(models.Booking.created_at.desc()).all()
 
     demo_leads = db.query(models.DemoBooking).filter(
-        (models.DemoBooking.tenant_id == tenant.id) | (models.DemoBooking.tenant_id == "default")
+        models.DemoBooking.tenant_id == tenant.id
     ).order_by(models.DemoBooking.created_at.desc()).all()
 
     existing_ids = {b.id for b in bookings}

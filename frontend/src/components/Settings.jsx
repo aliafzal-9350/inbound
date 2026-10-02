@@ -2,66 +2,228 @@ import { useState, useEffect } from "react";
 import {
   Key, CheckCircle, AlertTriangle, Eye, EyeOff, Save, ShieldCheck,
   Sparkles, FileText, Trash2, ExternalLink, Pencil, X, Plus, Loader2,
+  Lock, Bell, UserCog,
 } from "lucide-react";
 import { api } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 
 // ---------------------------------------------------------------------------
-// Provider metadata
+// Provider metadata (platform owner only)
 // ---------------------------------------------------------------------------
 const PROVIDERS = [
   {
-    id: "openai",
-    label: "OpenAI",
-    model: "gpt-4o-mini",
-    icon: "🤖",
-    color: "from-emerald-500 to-teal-600",
-    badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    description: "GPT-4o, GPT-4o-mini and the full OpenAI model family.",
-    getKeyUrl: "https://platform.openai.com/api-keys",
-    getKeyLabel: "OpenAI Developer Platform",
-    hint: "Sign in → API keys → Create new secret key",
-    placeholder: "sk-proj-...",
+    id: "groq",
+    label: "Groq — main AI",
+    model: "qwen3.8-27b + gpt-oss-120b",
+    icon: "🚀",
+    color: "from-orange-500 to-red-500",
+    badgeColor: "bg-orange-50 text-orange-700 border-orange-200",
+    description: "Understands every message and writes every reply. When you rotate the key, it is checked with Groq and used by all workspaces within 30 seconds.",
+    getKeyUrl: "https://console.groq.com/keys",
+    getKeyLabel: "Groq Console",
+    hint: "Log in → API Keys → Create API Key",
+    placeholder: "gsk_...",
   },
   {
     id: "gemini",
-    label: "Google Gemini",
-    model: "gemini-2.5-flash",
+    label: "Google Gemini — knowledge search",
+    model: "gemini-embedding-001",
     icon: "✨",
     color: "from-blue-500 to-indigo-600",
     badgeColor: "bg-blue-50 text-blue-700 border-blue-200",
-    description: "Gemini 2.5 Flash & Pro — free tier available via Google AI Studio.",
+    description: "Only used to index knowledge bases for meaning-based search. It never writes replies.",
     getKeyUrl: "https://aistudio.google.com/app/apikey",
     getKeyLabel: "Google AI Studio",
     hint: "Sign in with Google account → Create API key",
     placeholder: "AIza...",
   },
-  {
-    id: "xai",
-    label: "xAI (Grok)",
-    model: "grok-3-mini",
-    icon: "⚡",
-    color: "from-slate-600 to-gray-800",
-    badgeColor: "bg-slate-50 text-slate-700 border-slate-200",
-    description: "Grok-3 and Grok-3-mini by xAI — fast and powerful reasoning models.",
-    getKeyUrl: "https://console.x.ai/",
-    getKeyLabel: "xAI Console",
-    hint: "Sign in with X (Twitter) or email → API Keys → Generate key",
-    placeholder: "xai-...",
-  },
-  {
-    id: "groq",
-    label: "Groq",
-    model: "llama-3.3-70b-versatile",
-    icon: "🚀",
-    color: "from-orange-500 to-red-500",
-    badgeColor: "bg-orange-50 text-orange-700 border-orange-200",
-    description: "Llama-3.3-70B at lightning speed via Groq inference cloud — free tier.",
-    getKeyUrl: "https://console.groq.com/keys",
-    getKeyLabel: "Groq Console",
-    hint: "Log in → Create API Key (fast Llama/Mixtral hosting)",
-    placeholder: "gsk_...",
-  },
 ];
+
+// ---------------------------------------------------------------------------
+// Small shared pieces
+// ---------------------------------------------------------------------------
+function Notice({ msg }) {
+  if (!msg) return null;
+  const ok = msg.type === "success";
+  return (
+    <div
+      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border ${
+        ok ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"
+      }`}
+    >
+      {ok ? <CheckCircle size={13} className="flex-shrink-0" /> : <AlertTriangle size={13} className="flex-shrink-0" />}
+      {msg.text}
+    </div>
+  );
+}
+
+const inputClass =
+  "w-full px-3 py-2 border border-brand-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary-light focus:border-brand-primary text-text-main";
+const buttonClass =
+  "flex items-center justify-center gap-1.5 px-4 py-2 bg-brand-primary hover:bg-brand-primary-hover text-white text-xs font-semibold rounded-lg transition disabled:opacity-50";
+
+function SectionCard({ icon: Icon, title, subtitle, children }) {
+  return (
+    <div className="bg-white rounded-2xl border border-brand-border shadow-xs p-6 space-y-4">
+      <div>
+        <h2 className="font-display text-lg font-bold text-brand-dark flex items-center gap-2">
+          <Icon size={18} className="text-brand-primary" />
+          {title}
+        </h2>
+        {subtitle && <p className="text-xs text-text-muted mt-0.5">{subtitle}</p>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Account: change password (every user)
+// ---------------------------------------------------------------------------
+function ChangePasswordCard() {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setMsg(null);
+    if (next !== confirm) {
+      setMsg({ type: "error", text: "The new passwords don't match." });
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await api.changePassword(current, next);
+      setMsg({ type: "success", text: res.message || "Password changed." });
+      setCurrent("");
+      setNext("");
+      setConfirm("");
+    } catch (err) {
+      setMsg({ type: "error", text: err.message || "Could not change the password." });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <SectionCard icon={Lock} title="Change password" subtitle="Use at least 8 characters.">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <input type="password" required autoComplete="current-password" value={current}
+          onChange={(e) => setCurrent(e.target.value)} placeholder="Current password" className={inputClass} />
+        <input type="password" required minLength={8} autoComplete="new-password" value={next}
+          onChange={(e) => setNext(e.target.value)} placeholder="New password" className={inputClass} />
+        <input type="password" required minLength={8} autoComplete="new-password" value={confirm}
+          onChange={(e) => setConfirm(e.target.value)} placeholder="Confirm new password" className={inputClass} />
+        <div className="sm:col-span-3 flex items-center gap-3">
+          <button type="submit" disabled={saving} className={buttonClass}>
+            {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+            {saving ? "Saving…" : "Change password"}
+          </button>
+          <div className="flex-1"><Notice msg={msg} /></div>
+        </div>
+      </form>
+    </SectionCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Alerts: this business's own "customer wants a human" webhook (every user)
+// ---------------------------------------------------------------------------
+function AlertWebhookCard() {
+  const [url, setUrl] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  useEffect(() => {
+    api.getNotifications()
+      .then((res) => setUrl(res.alert_webhook_url || ""))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setMsg(null);
+    setSaving(true);
+    try {
+      const res = await api.saveNotifications(url.trim());
+      setUrl(res.alert_webhook_url || "");
+      setMsg({ type: "success", text: res.alert_webhook_url ? "Alert webhook saved." : "Alerts turned off." });
+    } catch (err) {
+      setMsg({ type: "error", text: err.message || "Could not save the webhook." });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <SectionCard
+      icon={Bell}
+      title="Alerts"
+      subtitle="When a customer asks to talk to a person, we post an alert to this webhook. Works with Slack incoming webhooks, Discord webhooks, Zapier or Make. Leave it empty to turn alerts off."
+    >
+      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
+        <input type="url" value={url} disabled={loading} onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://hooks.slack.com/services/..." className={`${inputClass} font-mono text-xs`} />
+        <button type="submit" disabled={saving || loading} className={buttonClass}>
+          {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </form>
+      <Notice msg={msg} />
+    </SectionCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Platform owner: reset a client's password
+// ---------------------------------------------------------------------------
+function ResetClientPasswordCard() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setMsg(null);
+    setSaving(true);
+    try {
+      const res = await api.adminResetPassword(email.trim(), password);
+      setMsg({ type: "success", text: `${res.message} Share the temporary password with them privately.` });
+      setEmail("");
+      setPassword("");
+    } catch (err) {
+      setMsg({ type: "error", text: err.message || "Could not reset the password." });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <SectionCard
+      icon={UserCog}
+      title="Reset a client's password"
+      subtitle="For clients who forgot their password: set a temporary one, send it to them privately, and ask them to change it under Settings."
+    >
+      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
+        <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+          placeholder="client@business.com" className={inputClass} />
+        <input type="text" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)}
+          placeholder="Temporary password (8+ characters)" className={inputClass} autoComplete="off" />
+        <button type="submit" disabled={saving} className={buttonClass}>
+          {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+          {saving ? "Resetting…" : "Reset"}
+        </button>
+      </form>
+      <Notice msg={msg} />
+    </SectionCard>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // ProviderCard component
@@ -179,7 +341,7 @@ function ProviderCard({ provider, keyData, onSaved, onDeleted }) {
         {confirmDelete && (
           <div className="flex flex-col gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
             <p className="text-[11px] text-red-700 font-medium">
-              Remove this API key from <code className="font-mono bg-red-100 px-1 rounded">.env</code>?
+              Remove this key? Features that use it stop working for every workspace until a new key is added.
             </p>
             <div className="flex gap-2">
               <button
@@ -316,12 +478,15 @@ function ProviderCard({ provider, keyData, onSaved, onDeleted }) {
 // Main Settings page
 // ---------------------------------------------------------------------------
 export default function Settings() {
+  const { user } = useAuth();
+  const isOwner = Boolean(user?.is_platform_admin);
   const [keysData, setKeysData] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchAllKeys();
-  }, []);
+    if (isOwner) fetchAllKeys();
+    else setLoading(false);
+  }, [isOwner]);
 
   async function fetchAllKeys() {
     try {
@@ -357,7 +522,7 @@ export default function Settings() {
     }));
   }
 
-  const configuredCount = Object.values(keysData).filter((k) => k.configured).length;
+  const configuredCount = PROVIDERS.filter((p) => keysData[p.id]?.configured).length;
 
   const complianceLinks = [
     {
@@ -391,62 +556,70 @@ export default function Settings() {
       {/* Header */}
       <div>
         <h1 className="font-display text-2xl font-bold tracking-tight text-brand-dark flex items-center gap-2">
-          AI &amp; Workspace Settings
+          Settings
         </h1>
         <p className="text-sm text-text-muted mt-1">
-          Configure LLM provider API keys for conversational AI and manage workspace compliance policies.
+          Manage your account, alerts and compliance pages.
         </p>
       </div>
 
-      {/* API Keys Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Key size={18} className="text-brand-primary" />
-            <h2 className="font-display text-lg font-bold text-brand-dark">
-              AI Provider API Keys
-            </h2>
+      <ChangePasswordCard />
+      <AlertWebhookCard />
+
+      {/* Platform owner only: shared AI keys and client support */}
+      {isOwner && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Key size={18} className="text-brand-primary" />
+              <h2 className="font-display text-lg font-bold text-brand-dark">
+                Platform AI keys
+              </h2>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-bg border border-brand-border text-text-muted">
+                Owner only
+              </span>
+            </div>
+            {!loading && (
+              <div
+                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border ${
+                  configuredCount === PROVIDERS.length
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-amber-50 text-amber-700 border-amber-200"
+                }`}
+              >
+                {configuredCount === PROVIDERS.length ? <CheckCircle size={13} /> : <AlertTriangle size={13} />}
+                {configuredCount}/{PROVIDERS.length} keys configured
+              </div>
+            )}
           </div>
-          {!loading && (
-            <div
-              className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border ${
-                configuredCount > 0
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : "bg-amber-50 text-amber-700 border-amber-200"
-              }`}
-            >
-              {configuredCount > 0 ? <CheckCircle size={13} /> : <AlertTriangle size={13} />}
-              {configuredCount}/{PROVIDERS.length} providers configured
+
+          <p className="text-xs text-text-muted -mt-1">
+            These keys are shared by every workspace on the platform. Only you can see or change them.
+          </p>
+
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {PROVIDERS.map((p) => (
+                <div key={p.id} className="bg-white rounded-2xl border border-brand-border h-52 animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {PROVIDERS.map((provider) => (
+                <ProviderCard
+                  key={provider.id}
+                  provider={provider}
+                  keyData={keysData[provider.id]}
+                  onSaved={handleSaved}
+                  onDeleted={handleDeleted}
+                />
+              ))}
             </div>
           )}
+
+          <ResetClientPasswordCard />
         </div>
-
-        <p className="text-xs text-text-muted -mt-1">
-          Configure one or more AI providers below. The engine uses them in priority order:
-          <span className="font-semibold text-text-main"> Groq → Gemini → xAI → OpenAI</span>.
-          At least one key is required for live AI replies.
-        </p>
-
-        {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="bg-white rounded-2xl border border-brand-border h-52 animate-pulse" />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {PROVIDERS.map((provider) => (
-              <ProviderCard
-                key={provider.id}
-                provider={provider}
-                keyData={keysData[provider.id]}
-                onSaved={handleSaved}
-                onDeleted={handleDeleted}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Compliance Section */}
       <div className="bg-white rounded-2xl border border-brand-border shadow-xs p-6 sm:p-8 space-y-6">

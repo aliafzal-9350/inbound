@@ -60,7 +60,12 @@ class LoginIn(BaseModel):
     password: str
 
 
-class ResetPasswordIn(BaseModel):
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class AdminResetPasswordIn(BaseModel):
     email: str
     new_password: str
 
@@ -69,11 +74,18 @@ class AuthOut(BaseModel):
     token: str
     tenant: TenantBasic
     email: str
+    is_platform_admin: bool = False
 
 
 class MeOut(BaseModel):
     tenant: TenantBasic
     email: str
+    is_platform_admin: bool = False
+
+
+class NotificationSettings(BaseModel):
+    # Where "customer wants a human" alerts for this business are posted (Slack/Discord/Zapier/Make webhook)
+    alert_webhook_url: Optional[str] = None
 
 
 class KnowledgeCreate(BaseModel):
@@ -207,9 +219,11 @@ __all__ = [
     "TenantBasic",
     "SignupIn",
     "LoginIn",
-    "ResetPasswordIn",
+    "ChangePasswordIn",
+    "AdminResetPasswordIn",
     "AuthOut",
     "MeOut",
+    "NotificationSettings",
     "KnowledgeCreate",
     "KnowledgeOut",
     "TestMessageIn",

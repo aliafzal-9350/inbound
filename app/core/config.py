@@ -73,6 +73,9 @@ class Settings(BaseSettings):
     WHATSAPP_QR_INTERNAL_SECRET: str = Field(default="dev-internal-secret", alias="WHATSAPP_QR_INTERNAL_SECRET")
     
     # Security
+    # Platform owner(s): the only accounts that can see/change AI provider keys, create workspaces via the
+    # API and reset other users' passwords. Comma-separated emails.
+    PLATFORM_ADMIN_EMAILS: str = Field(default="ravisn.uk@gmail.com", alias="PLATFORM_ADMIN_EMAILS")
     JWT_SECRET: str = Field(default="360808ff90807bb71369711ab46cb97f2bf947ccfd3069ee9fcb2844819383a0", alias="JWT_SECRET")
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_HOURS: int = 24 * 7

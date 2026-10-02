@@ -58,9 +58,14 @@ async function request(path, options = {}) {
 export const api = {
   signup: (payload) => request("/auth/signup", { method: "POST", body: JSON.stringify(payload) }),
   login: (payload) => request("/auth/login", { method: "POST", body: JSON.stringify(payload) }),
-  resetPassword: (email, new_password) =>
-    request("/auth/reset-password", { method: "POST", body: JSON.stringify({ email, new_password }) }),
+  changePassword: (current_password, new_password) =>
+    request("/auth/change-password", { method: "POST", body: JSON.stringify({ current_password, new_password }) }),
+  adminResetPassword: (email, new_password) =>
+    request("/auth/admin/reset-password", { method: "POST", body: JSON.stringify({ email, new_password }) }),
   me: () => request("/auth/me"),
+  getNotifications: () => request("/settings/notifications"),
+  saveNotifications: (alert_webhook_url) =>
+    request("/settings/notifications", { method: "POST", body: JSON.stringify({ alert_webhook_url }) }),
   listKnowledge: () => request("/knowledge"),
   addKnowledge: (payload) => request("/knowledge", { method: "POST", body: JSON.stringify(payload) }),
   uploadKnowledgeFile: async (formData) => {

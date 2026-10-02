@@ -15,19 +15,43 @@ logger = logging.getLogger(__name__)
 
 @celery_app.task(name="app.workers.tasks.dispatch_escalation_alert")
 def dispatch_escalation_alert(tenant_id: str, customer_phone: str, summary: str, reason: str):
-    """Sends immediate human escalation alert to WhatsApp Staff Group / Slack / CRM."""
+    """Posts a "customer wants a human" alert to the business's OWN webhook (Settings > Notifications).
+    The platform-wide STAFF_ESCALATION_WEBHOOK_URL only ever receives the platform owner's own alerts,
+    never another business's customers."""
+    from ..auth import is_platform_admin
+    from ..core.url_safety import public_https_url_error
+
     logger.info(f"[ESCALATION TRIGGERED] Tenant: {tenant_id}, Customer: {customer_phone}, Reason: {reason}")
-    
-    webhook_url = settings.STAFF_ESCALATION_WEBHOOK_URL
-    if webhook_url:
-        try:
-            payload = {
-                "text": f"🚨 *URGENT ESCALATION REQUIRED*\n*Tenant ID:* `{tenant_id}`\n*Customer:* `{customer_phone}`\n*Reason:* {reason}\n*Summary:* {summary}"
-            }
-            resp = httpx.post(webhook_url, json=payload, timeout=5.0)
-            logger.info(f"Escalation webhook status: {resp.status_code}")
-        except Exception as e:
-            logger.error(f"Failed to post escalation to webhook: {e}")
+    db = SessionLocal()
+    try:
+        tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+        if not tenant:
+            return
+        business = tenant.business_name or tenant.name or "your business"
+        webhook_url = tenant.alert_webhook_url
+        if not webhook_url and any(is_platform_admin(u) for u in tenant.users):
+            webhook_url = settings.STAFF_ESCALATION_WEBHOOK_URL
+    finally:
+        db.close()
+
+    if not webhook_url:
+        logger.info(f"No alert webhook configured for tenant {tenant_id}; escalation visible in the dashboard only")
+        return
+    if webhook_url != settings.STAFF_ESCALATION_WEBHOOK_URL:
+        error = public_https_url_error(webhook_url)   # re-checked at send time: DNS may have changed
+        if error:
+            logger.warning(f"Refusing alert webhook for tenant {tenant_id}: {error}")
+            return
+    text = (f"🚨 Customer wants to talk to a person - {business}\n"
+            f"Customer: {customer_phone}\nReason: {reason}\nMessage: {summary}")
+    try:
+        resp = httpx.post(webhook_url, timeout=5.0, follow_redirects=False, json={
+            "text": text, "content": text,   # Slack uses "text", Discord uses "content"
+            "business": business, "customer": customer_phone, "reason": reason, "message": summary,
+        })
+        logger.info(f"Escalation webhook status: {resp.status_code}")
+    except Exception as e:
+        logger.error(f"Failed to post escalation to webhook: {e}")
 
     staff_number = settings.STAFF_WHATSAPP_NUMBER
     if staff_number:

@@ -27,9 +27,13 @@ def connect_official(
     tenant: models.Tenant = Depends(get_current_tenant_flexible),
 ):
     extra = {"waba_id": payload.waba_id} if payload.waba_id else None
-    return crud.upsert_channel_connection(
-        db, tenant.id, "whatsapp", "official_api", payload.phone_number_id, payload.access_token, extra
-    )
+    try:
+        return crud.upsert_channel_connection(
+            db, tenant.id, "whatsapp", "official_api", payload.phone_number_id, payload.access_token, extra
+        )
+    except crud.ChannelOwnedByAnotherTenant:
+        raise HTTPException(status_code=409, detail="This WhatsApp number is already connected to another "
+                                                    "workspace. Disconnect it there first.")
 
 
 @router.get("/webhooks/whatsapp")
@@ -67,8 +71,10 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
                 models.ChannelConnection.channel == "whatsapp",
                 models.ChannelConnection.connection_method == "official_api",
                 models.ChannelConnection.external_account_id == phone_number_id,
+                models.ChannelConnection.status == "connected",
             ).first()
             if not connection:
+                logger.warning(f"[WhatsApp Webhook] No connected channel for phone_number_id={phone_number_id}; ignored")
                 continue
 
             contacts = {c["wa_id"]: c.get("profile", {}).get("name") for c in value.get("contacts", [])}

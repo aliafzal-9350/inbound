@@ -20,15 +20,21 @@ WEBHOOK_VERIFY_TOKEN = os.getenv("META_WEBHOOK_VERIFY_TOKEN", "ravisn-dev-verify
 APP_SECRET = os.getenv("META_APP_SECRET", "")
 
 
+ALREADY_CONNECTED = "This account is already connected to another workspace. Disconnect it there first."
+
+
 @router.post("/facebook/connect", response_model=schemas.ChannelConnectionOut)
 def connect_facebook(
     payload: schemas.FacebookConnectIn,
     db: Session = Depends(get_db),
     tenant: models.Tenant = Depends(get_current_tenant_flexible),
 ):
-    return crud.upsert_channel_connection(
-        db, tenant.id, "facebook", "official_api", payload.page_id, payload.access_token
-    )
+    try:
+        return crud.upsert_channel_connection(
+            db, tenant.id, "facebook", "official_api", payload.page_id, payload.access_token
+        )
+    except crud.ChannelOwnedByAnotherTenant:
+        raise HTTPException(status_code=409, detail=ALREADY_CONNECTED)
 
 
 @router.post("/instagram/connect", response_model=schemas.ChannelConnectionOut)
@@ -37,9 +43,12 @@ def connect_instagram(
     db: Session = Depends(get_db),
     tenant: models.Tenant = Depends(get_current_tenant_flexible),
 ):
-    return crud.upsert_channel_connection(
-        db, tenant.id, "instagram", "official_api", payload.ig_business_account_id, payload.access_token
-    )
+    try:
+        return crud.upsert_channel_connection(
+            db, tenant.id, "instagram", "official_api", payload.ig_business_account_id, payload.access_token
+        )
+    except crud.ChannelOwnedByAnotherTenant:
+        raise HTTPException(status_code=409, detail=ALREADY_CONNECTED)
 
 
 @router.get("/webhooks/meta")
@@ -75,28 +84,24 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
         account_id = entry.get("id")
         logger.info(f"[Meta Webhook] Processing entry id={account_id}")
         
-        # 1. Primary lookup by channel and external_account_id
+        # Route ONLY by an exact page / Instagram account id of a connected channel. Never guess:
+        # with several businesses, a guess would answer one business's customers with another's bot.
         connection = db.query(models.ChannelConnection).filter(
             models.ChannelConnection.channel == channel,
             models.ChannelConnection.connection_method == "official_api",
             models.ChannelConnection.external_account_id == account_id,
+            models.ChannelConnection.status == "connected",
         ).first()
-        
-        # 2. Fallback: match by external_account_id across any channel (in case Instagram webhook came via page object)
         if not connection:
-            connection = db.query(models.ChannelConnection).filter(
-                models.ChannelConnection.external_account_id == account_id,
-            ).first()
-
-        # 3. Fallback: if single connection exists for the tenant, use it
-        if not connection:
+            # Same exact id under the other Meta channel (an Instagram account can arrive via a page object)
             connection = db.query(models.ChannelConnection).filter(
                 models.ChannelConnection.channel.in_(["facebook", "instagram"]),
+                models.ChannelConnection.external_account_id == account_id,
                 models.ChannelConnection.status == "connected",
             ).first()
 
         if not connection:
-            logger.warning(f"[Meta Webhook] No ChannelConnection found for account_id={account_id}. Active connections: {[c.external_account_id for c in db.query(models.ChannelConnection).all()]}")
+            logger.warning(f"[Meta Webhook] No connected channel for {object_type} account id={account_id}; event ignored")
             continue
 
         actual_channel = connection.channel

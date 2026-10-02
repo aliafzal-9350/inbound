@@ -23,13 +23,13 @@ export function AuthProvider({ children }) {
   async function login(email, password) {
     const data = await api.login({ email, password });
     setToken(data.token);
-    setUser({ tenant: data.tenant, email: data.email });
+    setUser({ tenant: data.tenant, email: data.email, is_platform_admin: data.is_platform_admin });
   }
 
   async function signup(business_name, slug, email, password) {
     const data = await api.signup({ business_name, slug, email, password });
     setToken(data.token);
-    setUser({ tenant: data.tenant, email: data.email });
+    setUser({ tenant: data.tenant, email: data.email, is_platform_admin: data.is_platform_admin });
   }
 
   function logout() {

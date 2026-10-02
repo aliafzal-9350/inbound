@@ -26,6 +26,8 @@ class Tenant(Base):
     calendar_event_type_id = Column(String(100), nullable=True)
     system_prompt_override = Column(Text, nullable=True)
     custom_system_prompt = Column(Text, nullable=True)  # Backward compat alias
+    # This business's own destination for "customer wants a human" alerts (Slack/Discord/Zapier/Make webhook)
+    alert_webhook_url = Column(String(500), nullable=True)
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 

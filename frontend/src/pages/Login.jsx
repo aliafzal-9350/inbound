@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { api } from "../lib/api";
 import RavisnLogo from "../components/RavisnLogo";
+
+const SUPPORT_EMAIL = "ravisn.uk@gmail.com";
 
 export default function Login() {
   const { login } = useAuth();
@@ -11,14 +12,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  // Forgot password modal state
   const [showForgotModal, setShowForgotModal] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [resetSuccess, setResetSuccess] = useState("");
-  const [resetError, setResetError] = useState("");
-  const [resetLoading, setResetLoading] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -31,29 +25,6 @@ export default function Login() {
       setError(err.message);
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleResetPassword(e) {
-    e.preventDefault();
-    setResetError("");
-    setResetSuccess("");
-    setResetLoading(true);
-    try {
-      const res = await api.post("/auth/reset-password", {
-        email: forgotEmail,
-        new_password: newPassword,
-      });
-      setResetSuccess("Password reset successfully! You can now log in with your new password.");
-      setTimeout(() => {
-        setShowForgotModal(false);
-        setResetSuccess("");
-        setEmail(forgotEmail);
-      }, 2000);
-    } catch (err) {
-      setResetError(err.message);
-    } finally {
-      setResetLoading(false);
     }
   }
 
@@ -104,10 +75,7 @@ export default function Login() {
                 </label>
                 <button
                   type="button"
-                  onClick={() => {
-                    setResetEmail(email);
-                    setShowForgotModal(true);
-                  }}
+                  onClick={() => setShowForgotModal(true)}
                   className="text-xs text-accent hover:underline font-medium"
                 >
                   Forgot password?
@@ -162,57 +130,22 @@ export default function Login() {
       {showForgotModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h2 className="text-xl font-semibold mb-2">Reset Password</h2>
+            <h2 className="text-xl font-semibold mb-2">Forgot your password?</h2>
             <p className="text-sm text-ink-muted mb-4">
-              Enter your email and a new password to update your login credentials.
+              For your security, password resets are handled by our support team. Email{" "}
+              <a href={`mailto:${SUPPORT_EMAIL}?subject=Password%20reset`} className="text-accent font-medium hover:underline">
+                {SUPPORT_EMAIL}
+              </a>{" "}
+              from your account's email address and we'll send you a temporary password. After logging in, change it
+              under Settings.
             </p>
-
-            <form onSubmit={handleResetPassword} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Email</label>
-                <input
-                  type="email"
-                  required
-                  value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)}
-                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-accent"
-                  placeholder="you@business.com"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">New Password</label>
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-accent"
-                  placeholder="At least 6 characters"
-                />
-              </div>
-
-              {resetError && <p className="text-xs text-red-600">{resetError}</p>}
-              {resetMessage && <p className="text-xs text-green-600 font-medium">{resetMessage}</p>}
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowForgotModal(false)}
-                  className="flex-1 py-2 rounded-lg border border-line text-sm font-medium hover:bg-slate-50 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={resetLoading}
-                  className="flex-1 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:opacity-90 transition disabled:opacity-60"
-                >
-                  {resetLoading ? "Updating…" : "Update Password"}
-                </button>
-              </div>
-            </form>
+            <button
+              type="button"
+              onClick={() => setShowForgotModal(false)}
+              className="w-full py-2 rounded-lg border border-line text-sm font-medium hover:bg-slate-50 transition"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

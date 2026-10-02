@@ -110,6 +110,7 @@ def init_db_extensions(db_engine=engine):
                 CREATE INDEX IF NOT EXISTS ix_knowledge_base_embedding
                     ON knowledge_base USING hnsw (embedding vector_cosine_ops);
                 ALTER TABLE conversations ADD COLUMN IF NOT EXISTS agent_state JSON;
+                ALTER TABLE tenants ADD COLUMN IF NOT EXISTS alert_webhook_url VARCHAR(500);
             """
             try:
                 conn.execute(text(agent_sql))

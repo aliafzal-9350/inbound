@@ -3,9 +3,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
-from .. import models, crud, agent
+from .. import models, crud, agent, schemas
 from ..database import get_db
-from ..auth import get_current_tenant_flexible
+from ..auth import get_current_tenant_flexible, require_platform_admin
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -102,7 +102,7 @@ class ApiKeyUpdate(BaseModel):
 
 
 @router.get("/api-key")
-def get_api_key(tenant: models.Tenant = Depends(get_current_tenant_flexible)):
+def get_api_key(_owner: models.User = Depends(require_platform_admin)):
     from ..core.api_keys import get_key
     key = get_key("GROQ_API_KEY") or ""
     if not key:
@@ -112,7 +112,7 @@ def get_api_key(tenant: models.Tenant = Depends(get_current_tenant_flexible)):
 
 
 @router.post("/api-key")
-def update_api_key(payload: ApiKeyUpdate, tenant: models.Tenant = Depends(get_current_tenant_flexible)):
+def update_api_key(payload: ApiKeyUpdate, _owner: models.User = Depends(require_platform_admin)):
     new_key = payload.openai_api_key.strip()
     if not new_key:
         raise HTTPException(status_code=400, detail="API Key cannot be empty")
@@ -141,7 +141,7 @@ def update_api_key(payload: ApiKeyUpdate, tenant: models.Tenant = Depends(get_cu
 # ---------------------------------------------------------------------------
 
 @router.get("/api-keys")
-def get_all_api_keys(tenant: models.Tenant = Depends(get_current_tenant_flexible)):
+def get_all_api_keys(_owner: models.User = Depends(require_platform_admin)):
     """Return masked status for all four AI providers."""
     from ..core.api_keys import get_key
     result = {}
@@ -166,7 +166,7 @@ class ProviderKeyUpdate(BaseModel):
 def save_provider_key(
     provider: str,
     payload: ProviderKeyUpdate,
-    tenant: models.Tenant = Depends(get_current_tenant_flexible),
+    _owner: models.User = Depends(require_platform_admin),
 ):
     """Save / update an API key for a specific provider."""
     if provider not in _PROVIDER_ENV_MAP:
@@ -192,7 +192,7 @@ def save_provider_key(
 @router.delete("/api-keys/{provider}")
 def delete_provider_key(
     provider: str,
-    tenant: models.Tenant = Depends(get_current_tenant_flexible),
+    _owner: models.User = Depends(require_platform_admin),
 ):
     """Remove an API key for a specific provider (blanks it out from .env and memory)."""
     if provider not in _PROVIDER_ENV_MAP:
@@ -209,6 +209,29 @@ def delete_provider_key(
         "masked_key": "",
         "message": f"{_PROVIDER_LABELS[provider]} API key removed.",
     }
+
+
+@router.get("/notifications", response_model=schemas.NotificationSettings)
+def get_notifications(tenant: models.Tenant = Depends(get_current_tenant_flexible)):
+    return schemas.NotificationSettings(alert_webhook_url=tenant.alert_webhook_url)
+
+
+@router.post("/notifications", response_model=schemas.NotificationSettings)
+def save_notifications(
+    payload: schemas.NotificationSettings,
+    db: Session = Depends(get_db),
+    tenant: models.Tenant = Depends(get_current_tenant_flexible),
+):
+    """This business's own destination for "customer wants a human" alerts. Empty = turn alerts off."""
+    from ..core.url_safety import public_https_url_error
+    url = (payload.alert_webhook_url or "").strip() or None
+    if url:
+        error = public_https_url_error(url)
+        if error:
+            raise HTTPException(status_code=400, detail=error)
+    tenant.alert_webhook_url = url
+    db.commit()
+    return schemas.NotificationSettings(alert_webhook_url=url)
 
 
 class SystemPromptUpdate(BaseModel):

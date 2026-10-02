@@ -17,8 +17,20 @@ def create_tenant(db: Session, name: str, slug: str, business_name: Optional[str
     return tenant
 
 
+class ChannelOwnedByAnotherTenant(Exception):
+    """The page / Instagram account / WhatsApp number is already connected to another business."""
+
+
 def upsert_channel_connection(db: Session, tenant_id: str, channel: str, connection_method: str,
                                external_account_id: str, access_token: str, extra=None):
+    # One page/number belongs to exactly one business, otherwise webhook routing would be ambiguous
+    if external_account_id and db.query(models.ChannelConnection).filter(
+        models.ChannelConnection.external_account_id == external_account_id,
+        models.ChannelConnection.tenant_id != tenant_id,
+        models.ChannelConnection.status == "connected",
+    ).first():
+        raise ChannelOwnedByAnotherTenant(external_account_id)
+
     conn = db.query(models.ChannelConnection).filter(
         models.ChannelConnection.tenant_id == tenant_id,
         models.ChannelConnection.channel == channel,
